@@ -378,13 +378,11 @@ const VIOLATION_TITLES: Record<string, string> = {
   "image-alt": "Missing alt text",
   "html-lang-valid": "No page language",
   "document-title": "Missing page title",
-  "link-name": "Empty link text",
   "label": "Missing form label",
   "heading-order": "Heading order issue",
   "button-name": "Empty button",
   "role-presentation": "Focusable with presentation role",
   "aria-hidden-focus": "Hidden but focusable",
-  "frame-title": "Untitled iframe",
   "duplicate-id": "Duplicate ID",
   "video-autoplay": "Video autoplay",
   "audio-autoplay": "Audio autoplay",
@@ -471,38 +469,7 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     ));
   }
 
-  // 4. Links without discernible text
-  const linkRegex = /<a\s[^>]*href\s*=\s*["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  while ((match = linkRegex.exec(cleanHtml)) !== null) {
-    const fullTag = match[0];
-    const href = match[1];
-    const innerContent = match[2];
-
-    if (href.startsWith("#")) continue;
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
-
-    const hasAriaLabel = /aria-label\s*=\s*["'][^"']+["']/i.test(fullTag);
-    const hasAriaLabelledBy = /aria-labelledby\s*=\s*["'][^"']+["']/i.test(fullTag);
-    const hasTitle = /title\s*=\s*["'][^"']+["']/i.test(fullTag);
-    const hasImgWithAlt = /<img[^>]+alt\s*=\s*["'][^"']+["']/i.test(innerContent);
-    const hasSvgWithLabel = /<svg[^>]+aria-label\s*=\s*["'][^"']+["']/i.test(innerContent) ||
-      /<svg[^>]+role\s*=\s*["']img["']/i.test(innerContent);
-    const textContent = decodeEntities(innerContent.replace(/<[^>]*>/g, "")).trim();
-
-    if (!hasAriaLabel && !hasAriaLabelledBy && !hasTitle && !hasImgWithAlt && !hasSvgWithLabel && textContent.length === 0) {
-      violations.push(createViolation(
-        "link-name",
-        "serious",
-        "WCAG 2.4.4",
-        "Link has no discernible text. Screen readers will announce the href URL instead of a meaningful name.",
-        "https://dequeuniversity.com/rules/axe/4.9/link-name",
-        truncate(fullTag, 200),
-        buildSelector(fullTag)
-      ));
-    }
-  }
-
-  // 5. Form inputs without associated labels
+  // 4. Form inputs without associated labels
   const inputRegex = /<input[^>]*>/gi;
   while ((match = inputRegex.exec(cleanHtml)) !== null) {
     const inputTag = match[0];
@@ -693,24 +660,7 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     ));
   }
 
-  // 12. iframe without title
-  const iframeRegex = /<iframe[^>]*>/gi;
-  while ((match = iframeRegex.exec(cleanHtml)) !== null) {
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
-    if (!/title\s*=\s*["'][^"']+["']/i.test(match[0])) {
-      violations.push(createViolation(
-        "frame-title",
-        "serious",
-        "WCAG 2.4.1",
-        "iframe does not have a title attribute. Screen readers announce iframes as unnamed frames.",
-        "https://dequeuniversity.com/rules/axe/4.9/frame-title",
-        truncate(match[0], 200),
-        buildSelector(match[0])
-      ));
-    }
-  }
-
-  // 13. Duplicate IDs
+  // 12. Duplicate IDs
   const idRegex = /id\s*=\s*["']([^"']+)["']/gi;
   const idCounts: Record<string, number> = {};
   while ((match = idRegex.exec(cleanHtml)) !== null) {
