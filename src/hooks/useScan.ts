@@ -9,7 +9,7 @@ export function useScan() {
   const [scanId, setScanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const startScan = useCallback(async (url: string, maxDepth: number, maxPages: number) => {
+  const startScan = useCallback(async (url: string, maxDepth: number) => {
     setError(null);
     setScanData(null);
 
@@ -17,7 +17,7 @@ export function useScan() {
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, maxDepth, maxPages }),
+        body: JSON.stringify({ url, maxDepth }),
       });
 
       if (!response.ok) {

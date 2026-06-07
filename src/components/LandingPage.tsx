@@ -2,14 +2,13 @@ import { useState } from "react";
 import { Shield, Globe, Layers, ArrowRight, CheckCircle2, Search, Zap, BarChart3 } from "lucide-react";
 
 interface LandingPageProps {
-  onStartScan: (url: string, maxDepth: number, maxPages: number) => void;
+  onStartScan: (url: string, maxDepth: number) => void;
   error: string | null;
 }
 
 export function LandingPage({ onStartScan, error }: LandingPageProps) {
   const [url, setUrl] = useState("");
   const [maxDepth, setMaxDepth] = useState(3);
-  const [maxPages, setMaxPages] = useState(50);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -19,7 +18,7 @@ export function LandingPage({ onStartScan, error }: LandingPageProps) {
     if (!/^https?:\/\//i.test(finalUrl)) {
       finalUrl = "https://" + finalUrl;
     }
-    onStartScan(finalUrl, maxDepth, maxPages);
+    onStartScan(finalUrl, maxDepth);
   };
 
   return (
@@ -109,37 +108,20 @@ export function LandingPage({ onStartScan, error }: LandingPageProps) {
 
             {/* Advanced Options Panel */}
             {isExpanded && (
-              <div className="mt-4 bg-slate-900/60 border border-slate-800 rounded-xl p-5 grid grid-cols-2 gap-5 animate-in fade-in duration-200">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-2">Crawl Depth</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={1}
-                      max={5}
-                      value={maxDepth}
-                      onChange={(e) => setMaxDepth(parseInt(e.target.value))}
-                      className="flex-1 accent-emerald-500"
-                    />
-                    <span className="text-sm font-mono text-emerald-400 w-6 text-right">{maxDepth}</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1">How deep to follow links from the start page</p>
+              <div className="mt-4 bg-slate-900/60 border border-slate-800 rounded-xl p-5 animate-in fade-in duration-200">
+                <label className="block text-xs font-medium text-slate-400 mb-2">Crawl Depth</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    value={maxDepth}
+                    onChange={(e) => setMaxDepth(parseInt(e.target.value))}
+                    className="flex-1 accent-emerald-500"
+                  />
+                  <span className="text-sm font-mono text-emerald-400 w-6 text-right">{maxDepth}</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-2">Max Pages</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={1}
-                      max={50}
-                      value={maxPages}
-                      onChange={(e) => setMaxPages(parseInt(e.target.value))}
-                      className="flex-1 accent-emerald-500"
-                    />
-                    <span className="text-sm font-mono text-emerald-400 w-8 text-right">{maxPages}</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1">Maximum number of pages to scan</p>
-                </div>
+                <p className="text-xs text-slate-600 mt-1">How deep to follow links from the start page</p>
               </div>
             )}
           </div>

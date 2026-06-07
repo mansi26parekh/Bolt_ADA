@@ -58,7 +58,6 @@ Deno.serve(async (req: Request) => {
       const body = await req.json();
       const targetUrl = body.url;
       const maxDepth = body.maxDepth || 3;
-      const maxPages = body.maxPages || 50;
 
       if (!targetUrl) {
         return new Response(JSON.stringify({ error: "URL is required" }), {
@@ -89,7 +88,7 @@ Deno.serve(async (req: Request) => {
       EdgeRuntime.waitUntil(
         (async () => {
           try {
-            await runMultiPageScan(supabase, scan.id, targetUrl, maxDepth, maxPages);
+            await runMultiPageScan(supabase, scan.id, targetUrl, maxDepth);
           } catch (err) {
             console.error("Scan failed:", err);
             await supabase
@@ -125,8 +124,7 @@ async function runMultiPageScan(
   supabase: ReturnType<typeof createClient>,
   scanId: string,
   rootUrl: string,
-  maxDepth: number,
-  maxPages: number
+  maxDepth: number
 ) {
   const visitedUrls = new Set<string>();
   const queuedUrls = new Set<string>(); // Track URLs scheduled for crawling
@@ -142,7 +140,7 @@ async function runMultiPageScan(
   }
 
   // Phase 1: Crawl and discover pages
-  while (pagesToScan.length > 0 && discoveredPages.length < maxPages) {
+  while (pagesToScan.length > 0) {
     const current = pagesToScan.shift()!;
     const normalizedUrl = normalizeUrl(current.url, rootUrl);
 
