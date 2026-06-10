@@ -188,7 +188,7 @@ async function runMultiPageScan(
     .eq("id", scanId);
 
   // Phase 2: Create page records and analyze
-  let totalViolations = 0;
+  const allViolations: { impact: string }[] = [];
   let totalPasses = 0;
   let pagesScanned = 0;
 
@@ -231,7 +231,7 @@ async function runMultiPageScan(
       }
 
       const pageScore = calculatePageScore(analysis, passCount);
-      totalViolations += analysis.length;
+      allViolations.push(...analysis.map((v) => ({ impact: v.impact })));
       totalPasses += passCount;
       pagesScanned++;
 
@@ -260,14 +260,14 @@ async function runMultiPageScan(
       .eq("id", scanId);
   }
 
-  const overallScore = calculateOverallScore(totalViolations, totalPasses, discoveredPages.length);
+  const overallScore = calculateOverallScore(allViolations, discoveredPages.length);
 
   await supabase
     .from("scans")
     .update({
       status: "completed",
       score: overallScore,
-      total_violations: totalViolations,
+      total_violations: allViolations.length,
       total_passes: totalPasses,
       pages_scanned: pagesScanned,
       completed_at: new Date().toISOString(),
@@ -786,11 +786,24 @@ function calculatePageScore(violations: Violation[], passCount: number): number 
   return Math.max(0, Math.round(100 - totalDeduction));
 }
 
-function calculateOverallScore(totalViolations: number, totalPasses: number, totalPages: number): number {
+function calculateOverallScore(
+  violations: { impact: string }[],
+  totalPages: number
+): number {
   if (totalPages === 0) return 0;
-  if (totalViolations === 0) return 100;
-  const ratio = totalPasses / (totalPasses + totalViolations);
-  return Math.round(ratio * 100);
+
+  const weights: Record<string, number> = {
+    critical: 15,
+    serious: 8,
+    moderate: 3,
+    minor: 1,
+  };
+
+  const totalDeduction = violations.reduce((sum, v) => {
+    return sum + (weights[v.impact] || 1);
+  }, 0);
+
+  return Math.max(0, Math.round(100 - totalDeduction));
 }
 
 // ─── Helpers ───
