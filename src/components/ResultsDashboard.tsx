@@ -286,9 +286,15 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                       <span className="text-xs text-red-400/80">
                         {page.violation_count} violations
                       </span>
-                      <span className="text-xs text-emerald-400/80">
-                        {page.pass_count} passes
-                      </span>
+                      {page.violation_count === 0 ? (
+                        <span className="text-xs text-emerald-400/80">
+                          All checks passed
+                        </span>
+                      ) : page.pass_count > 0 && (
+                        <span className="text-xs text-emerald-400/80">
+                          {page.pass_count} passes
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button
