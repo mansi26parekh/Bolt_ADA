@@ -377,7 +377,6 @@ const VIOLATION_TITLES: Record<string, string> = {
   "html-lang-valid": "No page language",
   "document-title": "Missing page title",
   "label": "Missing form label",
-  "heading-order": "Heading order issue",
   "button-name": "Empty button",
   "role-presentation": "Focusable with presentation role",
   "aria-hidden-focus": "Hidden but focusable",
@@ -570,39 +569,7 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     }
   }
 
-  // 8. Heading hierarchy - missing h1
-  const headings = [...cleanHtml.matchAll(/<h([1-6])[^>]*>/gi)];
-  if (headings.length > 0) {
-    const hasH1 = headings.some((h) => /<h1/i.test(h[0]));
-    if (!hasH1) {
-      violations.push(createViolation(
-        "heading-order",
-        "moderate",
-        "WCAG 1.3.1",
-        "Page has headings but is missing an h1. The h1 is the primary heading and helps users understand the page topic.",
-        "https://dequeuniversity.com/rules/axe/4.9/heading-order",
-        headings[0][0],
-        buildSelector(headings[0][0])
-      ));
-    }
-
-    const levels = headings.map((h) => parseInt(h[1]));
-    for (let i = 1; i < levels.length; i++) {
-      if (levels[i] - levels[i - 1] > 1) {
-        violations.push(createViolation(
-          "heading-order",
-          "moderate",
-          "WCAG 1.3.1",
-          `Heading level skipped from h${levels[i - 1]} to h${levels[i]}. Heading levels should not skip to maintain a logical content hierarchy.`,
-          "https://dequeuniversity.com/rules/axe/4.9/heading-order",
-          headings[i][0],
-          buildSelector(headings[i][0])
-        ));
-      }
-    }
-  }
-
-  // 9. Buttons without accessible text
+  // 8. Buttons without accessible text
   const buttonRegex = /<button[^>]*>([\s\S]*?)<\/button>/gi;
   while ((match = buttonRegex.exec(cleanHtml)) !== null) {
     const fullTag = match[0];
