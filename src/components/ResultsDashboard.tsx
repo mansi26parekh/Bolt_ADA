@@ -262,53 +262,112 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
 
         {/* Pages Tab */}
         {activeTab === "pages" && (
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl divide-y divide-slate-800/50">
-            {pages.map((page) => (
-              <div key={page.id} className="p-4">
-                <div className="flex items-start gap-3">
-                  {page.status === "completed" ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-200 truncate">
-                      {page.title || "Untitled Page"}
-                    </p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">{page.url}</p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <span className={`text-xs font-mono font-medium px-2 py-0.5 rounded-md ${scoreBg(page.score)} ${scoreColor(page.score)}`}>
-                        Score: {page.score ?? "N/A"}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        Depth: {page.depth}
-                      </span>
-                      <span className="text-xs text-red-400/80">
-                        {page.violation_count} violations
-                      </span>
-                      {page.violation_count === 0 ? (
-                        <span className="text-xs text-emerald-400/80">
-                          All checks passed
-                        </span>
-                      ) : page.pass_count > 0 && (
-                        <span className="text-xs text-emerald-400/80">
-                          {page.pass_count} passes
-                        </span>
-                      )}
-                    </div>
-                  </div>
+          <div className="space-y-2">
+            {pages.map((page) => {
+              const pageViolations = results.filter((r) => r.page_id === page.id);
+              const isExpanded = expandedViolations.has(`page-${page.id}`);
+              return (
+                <div
+                  key={page.id}
+                  className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden"
+                >
                   <button
-                    onClick={() => {
-                      setSelectedPage(page.id);
-                      setActiveTab("violations");
-                    }}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors shrink-0"
+                    onClick={() => toggleViolation(`page-${page.id}`)}
+                    className="w-full p-4 flex items-start gap-3 text-left hover:bg-slate-800/30 transition-colors"
                   >
-                    View Issues
+                    {page.status === "completed" ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-200 truncate">
+                        {page.title || "Untitled Page"}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{page.url}</p>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className={`text-xs font-mono font-medium px-2 py-0.5 rounded-md ${scoreBg(page.score)} ${scoreColor(page.score)}`}>
+                          Score: {page.score ?? "N/A"}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          Depth: {page.depth}
+                        </span>
+                        <span className="text-xs text-red-400/80">
+                          {page.violation_count} violations
+                        </span>
+                        {page.violation_count === 0 ? (
+                          <span className="text-xs text-emerald-400/80">
+                            All checks passed
+                          </span>
+                        ) : page.pass_count > 0 && (
+                          <span className="text-xs text-emerald-400/80">
+                            {page.pass_count} passes
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-slate-600 shrink-0 mt-1" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-slate-600 shrink-0 mt-1" />
+                    )}
                   </button>
+                  {isExpanded && pageViolations.length > 0 && (
+                    <div className="border-t border-slate-800/50 bg-slate-800/30 p-3 space-y-2">
+                      {pageViolations.map((result) => {
+                        const config = impactConfig[result.impact as ImpactLevel];
+                        const violationExpanded = expandedViolations.has(result.id);
+                        return (
+                          <div
+                            key={result.id}
+                            className="bg-slate-900/70 border border-slate-700/50 rounded-lg overflow-hidden"
+                          >
+                            <button
+                              onClick={() => toggleViolation(result.id)}
+                              className="w-full p-3 flex items-start gap-2 text-left hover:bg-slate-700/20 transition-colors"
+                            >
+                              <config.icon className={`w-3.5 h-3.5 ${config.color} shrink-0 mt-0.5`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-300 truncate">{result.title}</p>
+                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.color}`}>
+                                  {config.label}
+                                </span>
+                              </div>
+                              {violationExpanded ? (
+                                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+                              ) : (
+                                <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" />
+                              )}
+                            </button>
+                            {violationExpanded && (
+                              <div className="px-3 pb-3 pl-8 space-y-2">
+                                <p className="text-[11px] text-slate-400">{result.description}</p>
+                                {result.element && (
+                                  <code className="text-[10px] text-slate-400 bg-slate-800/50 px-2 py-1 rounded block break-all">
+                                    {result.element}
+                                  </code>
+                                )}
+                                {result.help_url && (
+                                  <a
+                                    href={result.help_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                                  >
+                                    Learn how to fix
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
