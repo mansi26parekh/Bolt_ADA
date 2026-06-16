@@ -836,21 +836,47 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     ));
   }
 
-  // 19. CAPTCHA without accessible alternative
-  // Detects reCAPTCHA, hCaptcha, Cloudflare Turnstile, and any custom recaptcha placeholder
-  // class names (e.g. "recaptcha-fit") used by JS-rendered widgets.
-  // CAPTCHAs are visually-dependent challenges — WCAG 1.1.1 requires a non-visual alternative.
-  const captchaPatterns = [
-    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/i, label: "Google reCAPTCHA", selector: ".g-recaptcha" },
-    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/i, label: "hCaptcha", selector: ".h-captcha" },
-    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bcf-turnstile\b[^"']*["'][^>]*>/i, label: "Cloudflare Turnstile", selector: ".cf-turnstile" },
-    // Catch any element whose class contains "recaptcha" (e.g. recaptcha-fit, recaptcha-wrapper)
-    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*recaptcha[^"']*["'][^>]*>/i, label: "reCAPTCHA placeholder", selector: "[class*='recaptcha']" },
+  // 19 & 20. CAPTCHA detection — widget presence + injected unlabeled form field
+  // Each CAPTCHA widget (reCAPTCHA, hCaptcha, Turnstile) injects a hidden response
+  // field at runtime that has no label. Wave flags both the widget AND the field.
+  // We fire both violations whenever the widget container is detected in static HTML,
+  // because the injected field won't appear in a plain HTTP fetch.
+  const captchaPatterns: Array<{
+    regex: RegExp; label: string; selector: string;
+    fieldSelector: string; fieldName: string;
+  }> = [
+    {
+      regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/i,
+      label: "Google reCAPTCHA", selector: ".g-recaptcha",
+      fieldSelector: "textarea[name='g-recaptcha-response']", fieldName: "g-recaptcha-response",
+    },
+    {
+      regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/i,
+      label: "hCaptcha", selector: ".h-captcha",
+      fieldSelector: "textarea[name='h-captcha-response']", fieldName: "h-captcha-response",
+    },
+    {
+      regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bcf-turnstile\b[^"']*["'][^>]*>/i,
+      label: "Cloudflare Turnstile", selector: ".cf-turnstile",
+      fieldSelector: "input[name='cf-turnstile-response']", fieldName: "cf-turnstile-response",
+    },
+    // Any element whose class contains "recaptcha" (e.g. recaptcha-fit, recaptcha-wrapper)
+    {
+      regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*recaptcha[^"']*["'][^>]*>/i,
+      label: "reCAPTCHA placeholder", selector: "[class*='recaptcha']",
+      fieldSelector: "textarea[name='g-recaptcha-response']", fieldName: "g-recaptcha-response",
+    },
   ];
+
   const seenCaptcha = new Set<string>();
+  const seenCaptchaField = new Set<string>();
+
   for (const cp of captchaPatterns) {
     const captchaMatch = cp.regex.exec(html);
-    if (captchaMatch && !seenCaptcha.has(cp.selector)) {
+    if (!captchaMatch) continue;
+
+    // Violation 1: inaccessible CAPTCHA (one per widget type)
+    if (!seenCaptcha.has(cp.selector)) {
       seenCaptcha.add(cp.selector);
       violations.push(createViolation(
         "captcha",
@@ -862,26 +888,20 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
         cp.selector
       ));
     }
-  }
 
-  // 20. g-recaptcha-response hidden textarea — unlabeled control injected by reCAPTCHA
-  // Wave flags this as a missing label error; detect it in both static and script-injected markup.
-  const gResponseRegex = /<textarea\b[^>]*\bname\s*=\s*["']g-recaptcha-response["'][^>]*>/i;
-  const gResponseMatch = gResponseRegex.exec(html);
-  if (gResponseMatch) {
-    const tag = gResponseMatch[0];
-    const hasLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(tag) ||
-      /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag) ||
-      /\btitle\s*=\s*["'][^"']+["']/i.test(tag);
-    if (!hasLabel) {
+    // Violation 2: missing form label for the injected response field.
+    // Fire proactively — Wave flags this even when the field is JS-injected,
+    // so we don't wait for it to appear in static HTML.
+    if (!seenCaptchaField.has(cp.fieldName)) {
+      seenCaptchaField.add(cp.fieldName);
       violations.push(createViolation(
         "captcha-response",
         "serious",
         "WCAG 1.3.1",
-        "The reCAPTCHA response textarea (g-recaptcha-response) has no accessible label. Screen readers cannot identify this field's purpose.",
+        `${cp.label} injects a form field (${cp.fieldName}) with no accessible label. Screen readers and Wave flag this as a missing form label because the injected input is never associated with a <label> element.`,
         "https://dequeuniversity.com/rules/axe/4.9/label",
-        truncate(tag, 200),
-        "textarea[name='g-recaptcha-response']"
+        `<textarea name="${cp.fieldName}"></textarea>`,
+        cp.fieldSelector
       ));
     }
   }
