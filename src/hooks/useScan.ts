@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { ScanData, View } from "../lib/types";
 
 const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export function useScan() {
   const [view, setView] = useState<View>("landing");
@@ -16,7 +17,11 @@ export function useScan() {
     try {
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": ANON_KEY,
+          "Authorization": `Bearer ${ANON_KEY}`,
+        },
         body: JSON.stringify({ url, maxDepth }),
       });
 
@@ -36,7 +41,11 @@ export function useScan() {
   const fetchScanData = useCallback(async (id: string) => {
     try {
       const response = await fetch(`${API_URL}/${id}`, {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": ANON_KEY,
+          "Authorization": `Bearer ${ANON_KEY}`,
+        },
       });
 
       if (!response.ok) throw new Error("Failed to fetch scan data");
