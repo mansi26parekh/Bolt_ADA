@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   AlertTriangle,
   AlertOctagon,
-  AlertCircle,
-  Info,
   ExternalLink,
   ChevronDown,
   ChevronRight,
@@ -22,14 +20,12 @@ interface ResultsDashboardProps {
   onReset: () => void;
 }
 
-type ImpactLevel = "critical" | "serious" | "moderate" | "minor";
+type ImpactLevel = "error" | "alert";
 type Tab = "overview" | "pages" | "violations";
 
 const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: string; bg: string; badge: string; border: string; label: string }> = {
-  critical: { icon: AlertOctagon, color: "text-red-400", bg: "bg-red-500/10", badge: "bg-red-500/20 text-red-300 border border-red-500/30", border: "border-l-2 border-l-red-500/60", label: "Critical" },
-  serious: { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-500/10", badge: "bg-orange-500/20 text-orange-300 border border-orange-500/30", border: "border-l-2 border-l-orange-500/60", label: "Serious" },
-  moderate: { icon: AlertCircle, color: "text-amber-400", bg: "bg-amber-500/10", badge: "bg-amber-500/20 text-amber-300 border border-amber-500/30", border: "border-l-2 border-l-amber-500/60", label: "Moderate" },
-  minor: { icon: Info, color: "text-blue-400", bg: "bg-blue-500/10", badge: "bg-blue-500/20 text-blue-300 border border-blue-500/30", border: "border-l-2 border-l-blue-500/60", label: "Minor" },
+  error: { icon: AlertOctagon, color: "text-red-400", bg: "bg-red-500/10", badge: "bg-red-500/20 text-red-300 border border-red-500/30", border: "border-l-2 border-l-red-500/60", label: "Error" },
+  alert: { icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/10", badge: "bg-amber-500/20 text-amber-300 border border-amber-500/30", border: "border-l-2 border-l-amber-500/60", label: "Alert" },
 };
 
 export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
@@ -42,7 +38,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   const { scan, pages, results } = scanData;
 
   const violationsByImpact = useMemo(() => {
-    const counts: Record<ImpactLevel, number> = { critical: 0, serious: 0, moderate: 0, minor: 0 };
+    const counts: Record<ImpactLevel, number> = { error: 0, alert: 0 };
     results.forEach((r) => { counts[r.impact as ImpactLevel]++; });
     return counts;
   }, [results]);
@@ -139,7 +135,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
               {scan.total_violations} violations found across {scan.pages_scanned} pages
             </p>
             <div className="flex items-center gap-4">
-              {(["critical", "serious", "moderate", "minor"] as ImpactLevel[]).map((impact) => {
+              {(["error", "alert"] as ImpactLevel[]).map((impact) => {
                 const config = impactConfig[impact];
                 const count = violationsByImpact[impact];
                 if (count === 0) return null;

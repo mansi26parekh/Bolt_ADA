@@ -444,6 +444,16 @@ function analyzeAccessibility(
   let lfm: RegExpExecArray | null;
   while ((lfm = labelForRe.exec(cleanHtml)) !== null) labelForIds.add(lfm[1]);
 
+  // Pre-compute ARIA-referenced + label-referenced IDs — duplicate-id only fires for these
+  const referencedIds = new Set<string>(labelForIds);
+  const ariaRefCollRe = /\b(?:aria-labelledby|aria-describedby|aria-controls|aria-owns)\s*=\s*["']([^"']+)["']/gi;
+  let arcm: RegExpExecArray | null;
+  while ((arcm = ariaRefCollRe.exec(cleanHtml)) !== null) {
+    for (const refId of arcm[1].trim().split(/\s+/)) {
+      if (refId) referencedIds.add(refId);
+    }
+  }
+
   let match: RegExpExecArray | null;
 
   function controlHasLabel(tag: string, idx: number): boolean {
@@ -462,7 +472,7 @@ function analyzeAccessibility(
     if (inNoscript(match.index)) continue;
     if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(tag)) continue;
     if (!/\balt\s*=/i.test(tag)) {
-      violations.push(v("image-alt", "serious", "WCAG 1.1.1",
+      violations.push(v("image-alt", "error", "WCAG 1.1.1",
         "Image is missing an alt attribute. Screen readers cannot convey the image's content or purpose to non-sighted users.",
         "https://dequeuniversity.com/rules/axe/4.9/image-alt", truncate(tag, 200), buildSelector(tag)));
     } else if (/\balt\s*=\s*["'][^"']+["']/i.test(tag)) {
@@ -488,7 +498,7 @@ function analyzeAccessibility(
 
     // Check #2: linked image with no accessible text
     if (/<img\b/i.test(inner) && !hasImgAlt && !hasAL && !hasALB && !hasT && text.length === 0) {
-      violations.push(v("image-alt-empty-link", "serious", "WCAG 1.1.1",
+      violations.push(v("image-alt-empty-link", "error", "WCAG 1.1.1",
         "A linked image has an empty or missing alt attribute and the link contains no other text. Screen readers cannot determine the link's purpose.",
         "https://dequeuniversity.com/rules/axe/4.9/image-alt", truncate(fullTag, 200), buildSelector(fullTag)));
     }
@@ -497,7 +507,7 @@ function analyzeAccessibility(
     if (!/\baria-hidden\s*=\s*["']true["']/i.test(openTag)) {
       const accessible = hasAL || hasALB || hasT || hasImgAlt || hasSvg || text.length > 0;
       if (!accessible) {
-        violations.push(v("link-name", "serious", "WCAG 4.1.2",
+        violations.push(v("link-name", "error", "WCAG 4.1.2",
           "Link has no accessible text. Screen readers cannot convey this link's purpose to the user.",
           "https://dequeuniversity.com/rules/axe/4.9/link-name", truncate(fullTag, 200), buildSelector(fullTag)));
       } else {
@@ -509,7 +519,7 @@ function analyzeAccessibility(
   // ── 3. HTML lang ──
   const htmlTag = cleanHtml.match(/<html\b[^>]*>/i);
   if (htmlTag && !/\blang\s*=/i.test(htmlTag[0])) {
-    violations.push(v("html-lang-valid", "serious", "WCAG 3.1.1",
+    violations.push(v("html-lang-valid", "error", "WCAG 3.1.1",
       "The <html> element does not have a lang attribute. Screen readers use this to select the correct voice and pronunciation engine.",
       "https://dequeuniversity.com/rules/axe/4.9/html-lang-valid", "<html>", "html"));
   } else if (htmlTag) {
@@ -519,7 +529,7 @@ function analyzeAccessibility(
   // ── 4. Document title ──
   const titleMatch = cleanHtml.match(/<title\b[^>]*>([^<]*)<\/title>/i);
   if (!titleMatch || titleMatch[1].trim().length === 0) {
-    violations.push(v("document-title", "serious", "WCAG 2.4.2",
+    violations.push(v("document-title", "error", "WCAG 2.4.2",
       "Document does not have a meaningful <title> element. Page titles identify each page in browser history, bookmarks, and screen reader announcements.",
       "https://dequeuniversity.com/rules/axe/4.9/document-title", "<title>", "head > title"));
   } else {
@@ -535,7 +545,7 @@ function analyzeAccessibility(
     const inputType = tm ? tm[1].toLowerCase() : "text";
     if (inputType === "image") {
       if (!/\balt\s*=\s*["'][^"']*["']/i.test(tag)) {
-        violations.push(v("input-image-alt", "serious", "WCAG 1.1.1",
+        violations.push(v("input-image-alt", "error", "WCAG 1.1.1",
           "Image input button is missing an alt attribute. Screen readers cannot identify this button's purpose.",
           "https://dequeuniversity.com/rules/axe/4.9/input-image-alt", truncate(tag, 200), buildSelector(tag)));
       }
@@ -545,7 +555,7 @@ function analyzeAccessibility(
     if (controlHasLabel(tag, match.index)) {
       passCount++;
     } else {
-      violations.push(v("label", "serious", "WCAG 1.3.1",
+      violations.push(v("label", "error", "WCAG 1.3.1",
         "Form input does not have an associated label. Users relying on screen readers or voice control cannot determine what information to enter.",
         "https://dequeuniversity.com/rules/axe/4.9/label", truncate(tag, 200), buildSelector(tag)));
     }
@@ -556,7 +566,7 @@ function analyzeAccessibility(
     const tag = match[0];
     if (inNoscript(match.index)) continue;
     if (!controlHasLabel(tag, match.index)) {
-      violations.push(v("label", "serious", "WCAG 1.3.1",
+      violations.push(v("label", "error", "WCAG 1.3.1",
         "Select (dropdown) element does not have an associated label. Screen reader users cannot identify the purpose of this control.",
         "https://dequeuniversity.com/rules/axe/4.9/label", truncate(tag, 200), buildSelector(tag)));
     }
@@ -567,7 +577,7 @@ function analyzeAccessibility(
     const tag = match[0];
     if (inNoscript(match.index)) continue;
     if (!controlHasLabel(tag, match.index)) {
-      violations.push(v("label", "serious", "WCAG 1.3.1",
+      violations.push(v("label", "error", "WCAG 1.3.1",
         "Textarea element does not have an associated label.",
         "https://dequeuniversity.com/rules/axe/4.9/label", truncate(tag, 200), buildSelector(tag)));
     }
@@ -579,7 +589,7 @@ function analyzeAccessibility(
     const inner = match[1];
     const text = decodeEntities(inner.replace(/<[^>]*>/g, "")).trim();
     if (text.length === 0 && !/<img[^>]+\balt\s*=\s*["'][^"']+["']/i.test(inner)) {
-      violations.push(v("label-empty", "serious", "WCAG 1.3.1",
+      violations.push(v("label-empty", "error", "WCAG 1.3.1",
         "A <label> element exists but is empty. An empty label provides no information to screen reader users about the associated form control.",
         "https://dequeuniversity.com/rules/axe/4.9/label", truncate(match[0], 200), "label"));
     }
@@ -589,7 +599,7 @@ function analyzeAccessibility(
   const orphanRe = /<label\b[^>]*\bfor\s*=\s*["']([^"']+)["'][^>]*>/gi;
   while ((match = orphanRe.exec(cleanHtml)) !== null) {
     if (!allIds.has(match[1])) {
-      violations.push(v("label-orphaned", "moderate", "WCAG 1.3.1",
+      violations.push(v("label-orphaned", "error", "WCAG 1.3.1",
         `Label has for="${match[1]}" but no element with that ID exists on this page. The label is not associated with any form control.`,
         "https://dequeuniversity.com/rules/axe/4.9/label", truncate(match[0], 200), `label[for="${match[1]}"]`));
     }
@@ -611,7 +621,7 @@ function analyzeAccessibility(
       (/<svg\b/i.test(inner) && /<title\b[^>]*>[^<]+<\/title>/i.test(inner)) ||
       decodeEntities(inner.replace(/<[^>]*>/g, "")).trim().length > 0;
     if (!accessible) {
-      violations.push(v("button-name", "critical", "WCAG 4.1.2",
+      violations.push(v("button-name", "error", "WCAG 4.1.2",
         "Button has no accessible text. Screen readers will announce it as an unnamed button, making it impossible for users to understand its purpose.",
         "https://dequeuniversity.com/rules/axe/4.9/button-name", truncate(fullTag, 200), buildSelector(fullTag)));
     } else {
@@ -627,7 +637,7 @@ function analyzeAccessibility(
     if (!/\baria-label\s*=\s*["'][^"']+["']/i.test(openTag) &&
         !/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag) &&
         text.length === 0) {
-      violations.push(v("empty-heading", "serious", "WCAG 1.3.1",
+      violations.push(v("empty-heading", "error", "WCAG 1.3.1",
         `Heading level ${match[1]} (<h${match[1]}>) is empty. Empty headings disrupt screen reader navigation by creating dead landmarks.`,
         "https://dequeuniversity.com/rules/axe/4.9/empty-heading", truncate(match[0], 200), buildSelector(match[0])));
     }
@@ -639,7 +649,7 @@ function analyzeAccessibility(
   while ((match = hLevelRe.exec(cleanHtml)) !== null) hLevels.push(parseInt(match[1]));
   for (let i = 1; i < hLevels.length; i++) {
     if (hLevels[i] > hLevels[i - 1] + 1) {
-      violations.push(v("heading-order", "moderate", "WCAG 1.3.1",
+      violations.push(v("heading-order", "alert", "WCAG 1.3.1",
         `Heading jumps from h${hLevels[i - 1]} to h${hLevels[i]}. Heading levels must be sequential; skipped levels confuse screen reader navigation.`,
         "https://dequeuniversity.com/rules/axe/4.9/heading-order", `<h${hLevels[i]}>`, `h${hLevels[i]}`));
       break;
@@ -649,13 +659,13 @@ function analyzeAccessibility(
   // ── 14+15. Heading presence ──
   const hasH = /<h[1-6]\b/i.test(cleanHtml);
   if (!hasH) {
-    violations.push(v("heading-missing", "moderate", "WCAG 1.3.1",
+    violations.push(v("heading-missing", "alert", "WCAG 1.3.1",
       "Page has no heading elements (<h1>–<h6>). Headings allow screen reader users to navigate and understand page structure quickly.",
       "https://webaim.org/techniques/semanticstructure/#headings", "<body>", "body"));
   } else {
     passCount++;
     if (!/<h1\b/i.test(cleanHtml)) {
-      violations.push(v("heading-first-missing", "moderate", "WCAG 1.3.1",
+      violations.push(v("heading-first-missing", "alert", "WCAG 1.3.1",
         "Page has headings but no <h1> element. Every page should have a top-level heading that describes its main topic.",
         "https://dequeuniversity.com/rules/axe/4.9/page-has-heading-one", "<body>", "body"));
     } else {
@@ -670,7 +680,7 @@ function analyzeAccessibility(
     if (!/\btitle\s*=\s*["'][^"']+["']/i.test(tag) &&
         !/\baria-label\s*=\s*["'][^"']+["']/i.test(tag) &&
         !/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag)) {
-      violations.push(v("frame-title", "serious", "WCAG 4.1.2",
+      violations.push(v("frame-title", "error", "WCAG 4.1.2",
         "Iframe does not have a title attribute. Screen readers cannot identify the purpose of this embedded frame.",
         "https://dequeuniversity.com/rules/axe/4.9/frame-title", truncate(tag, 200), buildSelector(tag)));
     }
@@ -685,7 +695,7 @@ function analyzeAccessibility(
       if (am) {
         for (const refId of am[1].trim().split(/\s+/)) {
           if (refId && !allIds.has(refId)) {
-            violations.push(v("aria-reference-broken", "critical", "WCAG 4.1.2",
+            violations.push(v("aria-reference-broken", "error", "WCAG 4.1.2",
               `${attr}="${am[1]}" references id="${refId}" which does not exist on this page. Broken ARIA references cause screen readers to fail silently.`,
               "https://dequeuniversity.com/rules/axe/4.9/aria-valid-attr-value", truncate(tag, 200), buildSelector(tag)));
             break;
@@ -701,7 +711,7 @@ function analyzeAccessibility(
     const tag = match[0];
     const tm = /\btabindex\s*=\s*["']?(-?\d+)["']?/i.exec(tag);
     if (tm && parseInt(tm[1]) >= 0) {
-      violations.push(v("role-presentation", "serious", "WCAG 4.1.2",
+      violations.push(v("role-presentation", "error", "WCAG 4.1.2",
         'Element with role="presentation" is keyboard-focusable. This creates an invisible, confusing tab stop for keyboard and screen reader users.',
         "https://dequeuniversity.com/rules/axe/4.9/role-presentation", truncate(tag, 200), buildSelector(tag)));
     }
@@ -713,7 +723,7 @@ function analyzeAccessibility(
     const tag = match[0];
     const tm = /\btabindex\s*=\s*["']?(-?\d+)["']?/i.exec(tag);
     if (tm && parseInt(tm[1]) >= 0) {
-      violations.push(v("aria-hidden-focus", "serious", "WCAG 4.1.2",
+      violations.push(v("aria-hidden-focus", "error", "WCAG 4.1.2",
         'Element with aria-hidden="true" is keyboard-focusable. Keyboard users reach it, but screen readers ignore it — the element disappears mid-navigation.',
         "https://dequeuniversity.com/rules/axe/4.9/aria-hidden-focus", truncate(tag, 200), buildSelector(tag)));
     }
@@ -726,8 +736,8 @@ function analyzeAccessibility(
     idCounts[match[1]] = (idCounts[match[1]] || 0) + 1;
   }
   for (const [id, count] of Object.entries(idCounts)) {
-    if (count > 1) {
-      violations.push(v("duplicate-id", "moderate", "WCAG 4.1.1",
+    if (count > 1 && referencedIds.has(id)) {
+      violations.push(v("duplicate-id", "error", "WCAG 4.1.1",
         `id="${id}" appears ${count} times. IDs must be unique; duplicate IDs break label associations, ARIA references, and anchor navigation.`,
         "https://dequeuniversity.com/rules/axe/4.9/duplicate-id", `id="${id}"`, `#${cssEscape(id)}`));
     }
@@ -735,12 +745,12 @@ function analyzeAccessibility(
 
   // ── 21+22. Media autoplay ──
   if (/<video\b[^>]*\bautoplay\b/i.test(cleanHtml) && !/<video\b[^>]*\bcontrols\b/i.test(cleanHtml)) {
-    violations.push(v("video-autoplay", "moderate", "WCAG 1.4.2",
+    violations.push(v("video-autoplay", "alert", "WCAG 1.4.2",
       "Video autoplays without providing controls. Users should be able to pause, stop, or mute auto-playing media.",
       "https://www.w3.org/WAI/WCAG21/Understanding/audio-control.html", "video", "video"));
   }
   if (/<audio\b[^>]*\bautoplay\b/i.test(cleanHtml) && !/<audio\b[^>]*\bcontrols\b/i.test(cleanHtml)) {
-    violations.push(v("audio-autoplay", "moderate", "WCAG 1.4.2",
+    violations.push(v("audio-autoplay", "alert", "WCAG 1.4.2",
       "Audio autoplays without providing controls. Users should be able to pause, stop, or mute auto-playing media.",
       "https://www.w3.org/WAI/WCAG21/Understanding/audio-control.html", "audio", "audio"));
   }
@@ -748,13 +758,13 @@ function analyzeAccessibility(
   // ── 23+24. Blink + Marquee ──
   if (/<blink\b/i.test(cleanHtml)) {
     const bt = /<blink\b[^>]*>/i.exec(cleanHtml);
-    violations.push(v("blink", "serious", "WCAG 2.2.2",
+    violations.push(v("blink", "error", "WCAG 2.2.2",
       "A <blink> element is present. Blinking content cannot be paused and may trigger seizures in users with photosensitive epilepsy.",
       "https://www.w3.org/TR/WCAG21/#pause-stop-hide", bt ? truncate(bt[0], 200) : "<blink>", "blink"));
   }
   if (/<marquee\b/i.test(cleanHtml)) {
     const mt = /<marquee\b[^>]*>/i.exec(cleanHtml);
-    violations.push(v("marquee", "serious", "WCAG 2.2.2",
+    violations.push(v("marquee", "error", "WCAG 2.2.2",
       "A <marquee> element is present. Scrolling content cannot be paused by users, making it difficult or impossible to read for many disability groups.",
       "https://www.w3.org/TR/WCAG21/#pause-stop-hide", mt ? truncate(mt[0], 200) : "<marquee>", "marquee"));
   }
@@ -766,7 +776,7 @@ function analyzeAccessibility(
     if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(tableTag)) continue;
     if (/<th\b[^>]*>/i.test(match[1])) continue;
     if ((match[1].match(/<tr\b[^>]*>/gi) || []).length >= 2) {
-      violations.push(v("table-fake", "serious", "WCAG 1.3.1",
+      violations.push(v("table-fake", "error", "WCAG 1.3.1",
         "A data table has no header cells (<th>). Without headers, screen readers cannot identify what each column or row represents.",
         "https://dequeuniversity.com/rules/axe/4.9/table-fake", truncate(tableTag, 200), buildSelector(tableTag)));
     }
@@ -775,7 +785,7 @@ function analyzeAccessibility(
   // ── 27. Meta viewport zoom disabled ──
   if (/<meta\b[^>]+\bviewport\b[^>]+\buser-scalable\s*=\s*["']?no["']?/i.test(cleanHtml) ||
       /<meta\b[^>]+\bviewport\b[^>]+\bmaximum-scale\s*=\s*["']?1(?:\.0)?["']?/i.test(cleanHtml)) {
-    violations.push(v("meta-viewport", "serious", "WCAG 1.4.4",
+    violations.push(v("meta-viewport", "error", "WCAG 1.4.4",
       "Viewport meta tag prevents users from scaling the page. Users with low vision must be able to zoom to 200% without loss of content.",
       "https://dequeuniversity.com/rules/axe/4.9/meta-viewport", '<meta name="viewport">', "meta[name=viewport]"));
   }
@@ -785,7 +795,7 @@ function analyzeAccessibility(
   if (mrMatch) {
     const cv = /\bcontent\s*=\s*["'](\d+)/i.exec(mrMatch[0]);
     const delay = cv ? parseInt(cv[1]) : 0;
-    violations.push(v("meta-refresh", delay === 0 ? "moderate" : "serious", "WCAG 2.2.1",
+    violations.push(v("meta-refresh", "alert", "WCAG 2.2.1",
       delay === 0
         ? "Page uses an instant meta refresh/redirect. This can disorient screen reader users who are mid-way through reading content."
         : `Page auto-refreshes after ${delay} seconds. Auto-refreshing pages interrupt reading and cause loss of keyboard focus.`,
@@ -811,14 +821,14 @@ function analyzeAccessibility(
 // ─── Scoring ───
 
 function calculatePageScore(violations: Violation[], passCount: number): number {
-  const w: Record<string, number> = { critical: 12, serious: 6, moderate: 2, minor: 1 };
+  const w: Record<string, number> = { error: 8, alert: 2 };
   const deduction = violations.reduce((s, v) => s + (w[v.impact] || 1), 0);
   return Math.max(0, Math.min(100, Math.round(100 - deduction + Math.min(passCount * 0.5, 10))));
 }
 
 function calculateOverallScore(violations: { impact: string }[], totalPages: number): number {
   if (totalPages === 0) return 0;
-  const w: Record<string, number> = { critical: 15, serious: 8, moderate: 3, minor: 1 };
+  const w: Record<string, number> = { error: 10, alert: 3 };
   return Math.max(0, Math.round(100 - violations.reduce((s, v) => s + (w[v.impact] || 1), 0)));
 }
 
