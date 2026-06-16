@@ -37,6 +37,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
   const [expandedViolations, setExpandedViolations] = useState<Set<string>>(new Set());
+  const [expandedPage, setExpandedPage] = useState<string | null>(null);
 
   const { scan, pages, results } = scanData;
 
@@ -265,14 +266,14 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
           <div className="space-y-2">
             {pages.map((page) => {
               const pageViolations = results.filter((r) => r.page_id === page.id);
-              const isExpanded = expandedViolations.has(`page-${page.id}`);
+              const isExpanded = expandedPage === page.id;
               return (
                 <div
                   key={page.id}
                   className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden"
                 >
                   <button
-                    onClick={() => toggleViolation(`page-${page.id}`)}
+                    onClick={() => setExpandedPage((prev) => (prev === page.id ? null : page.id))}
                     className="w-full p-4 flex items-start gap-3 text-left hover:bg-slate-800/30 transition-colors"
                   >
                     {page.status === "completed" ? (
