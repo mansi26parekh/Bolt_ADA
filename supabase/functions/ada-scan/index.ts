@@ -139,7 +139,7 @@ async function runMultiPageScan(
     queuedUrls.add(normalizedRoot);
   }
 
-  const MAX_PAGES = 3;
+  const MAX_PAGES = body.maxPages || 50;
 
   // Phase 1: Crawl and discover pages
   while (pagesToScan.length > 0 && discoveredPages.length < MAX_PAGES) {
