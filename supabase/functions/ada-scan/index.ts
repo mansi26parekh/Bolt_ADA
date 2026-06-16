@@ -410,7 +410,6 @@ const VIOLATION_TITLES: Record<string, string> = {
   "button-name": "Empty button",
   "link-name": "Empty link",
   "link-suspicious": "Uninformative link text",
-  "link-document": "Link to document or file",
   "empty-heading": "Empty heading",
   "heading-order": "Skipped heading level",
   "heading-missing": "No headings on page",
@@ -422,15 +421,12 @@ const VIOLATION_TITLES: Record<string, string> = {
   "duplicate-id": "Duplicate ID",
   "blink": "Blinking content",
   "marquee": "Scrolling/marquee content",
-  "th-empty": "Empty table header cell",
   "table-fake": "Data table missing header cells",
   "video-autoplay": "Video autoplays without controls",
   "audio-autoplay": "Audio autoplays without controls",
   "meta-viewport": "Page zoom disabled",
   "meta-refresh": "Timed page refresh",
-  "tabindex-nonzero": "Positive tabindex value",
   "fieldset-missing": "Form group missing fieldset",
-  "region-missing": "No page landmark regions",
   "captcha": "Inaccessible CAPTCHA",
   "captcha-response": "CAPTCHA response field unlabeled",
   "third-party-iframe": "Third-party embed missing title",
@@ -1006,25 +1002,6 @@ function analyzeAccessibility(html: string, _pageUrl: string, preClean?: string)
     ));
   }
 
-  // 25. Empty table header cells (WAVE: th_empty)
-  const thRegex = /<th\b[^>]*>([\s\S]*?)<\/th>/gi;
-  while ((match = thRegex.exec(cleanHtml)) !== null) {
-    const innerContent = match[1];
-    const hasAriaLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(match[0]);
-    const textContent = decodeEntities(innerContent.replace(/<[^>]*>/g, "")).trim();
-    if (textContent.length === 0 && !hasAriaLabel) {
-      violations.push(createViolation(
-        "th-empty",
-        "moderate",
-        "WCAG 1.3.1",
-        "A table header cell (<th>) is empty. Screen readers read header cells to give data cells context; an empty header removes that context.",
-        "https://dequeuniversity.com/rules/axe/4.9/empty-table-header",
-        truncate(match[0], 200),
-        "th"
-      ));
-    }
-  }
-
   // 26. Data tables without any header cells (WAVE: table_col_header_invalid etc.)
   const tableRegex = /<table\b[^>]*>([\s\S]*?)<\/table>/gi;
   while ((match = tableRegex.exec(cleanHtml)) !== null) {
@@ -1106,23 +1083,6 @@ function analyzeAccessibility(html: string, _pageUrl: string, preClean?: string)
     }
   }
 
-  // 30. Excessively long alt text (WAVE: alt_long — WAVE threshold is 100 chars)
-  const imgAltLongRegex = /<img\b[^>]*\balt\s*=\s*["']([^"']{101,})["'][^>]*>/gi;
-  while ((match = imgAltLongRegex.exec(cleanHtml)) !== null) {
-    const imgTag = match[0];
-    const altText = match[1];
-    if (inNoscript(match.index)) continue;
-    violations.push(createViolation(
-      "alt-long",
-      "minor",
-      "WCAG 1.1.1",
-      `Image alt text is ${altText.length} characters long. Alt text over 100 characters is typically too verbose; consider using a figure caption or longdesc for complex images.`,
-      "https://webaim.org/techniques/alttext/",
-      truncate(imgTag, 200),
-      buildSelector(imgTag)
-    ));
-  }
-
   // 31. Uninformative link text (WAVE: link_suspicious)
   const SUSPICIOUS_LINK_TEXTS = new Set([
     "click here", "click", "here", "more", "read more", "learn more",
@@ -1151,24 +1111,6 @@ function analyzeAccessibility(html: string, _pageUrl: string, preClean?: string)
         buildSelector(fullTag)
       ));
     }
-  }
-
-  // 32. Links to document files — PDF, Word, Excel, PPT (WAVE: link_document)
-  const docLinkRegex = /<a\b[^>]*\bhref\s*=\s*["']([^"']+\.(?:pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|csv))["'][^>]*>/gi;
-  while ((match = docLinkRegex.exec(cleanHtml)) !== null) {
-    const fullTagStart = match[0];
-    const href = match[1];
-    const ext = href.split(".").pop()?.toLowerCase() || "";
-    if (inNoscript(match.index)) continue;
-    violations.push(createViolation(
-      "link-document",
-      "minor",
-      "WCAG 2.4.4",
-      `Link points to a .${ext.toUpperCase()} file. Inform users of the file type and size. Ensure the document is accessible or provide an HTML alternative.`,
-      "https://webaim.org/techniques/acrobat/",
-      truncate(fullTagStart, 200),
-      `a[href$=".${ext}"]`
-    ));
   }
 
   // 33. Radio/checkbox groups missing fieldset (WAVE: fieldset_missing)
@@ -1204,40 +1146,6 @@ function analyzeAccessibility(html: string, _pageUrl: string, preClean?: string)
         ));
       }
     }
-  }
-
-  // 34. Positive tabindex values (WAVE: tabindex)
-  const tabindexRegex = /<[^/][^>]*\btabindex\s*=\s*["']?(\d+)["']?[^>]*>/gi;
-  while ((match = tabindexRegex.exec(cleanHtml)) !== null) {
-    const tabVal = parseInt(match[1]);
-    if (tabVal > 0) {
-      violations.push(createViolation(
-        "tabindex-nonzero",
-        "moderate",
-        "WCAG 2.4.3",
-        `Element has tabindex="${tabVal}". Positive tabindex values override the natural reading order and create an unpredictable keyboard navigation sequence.`,
-        "https://dequeuniversity.com/rules/axe/4.9/tabindex",
-        truncate(match[0], 200),
-        buildSelector(match[0])
-      ));
-    }
-  }
-
-  // 35. No landmark regions on the page (WAVE: region)
-  const hasMain = /<main\b/i.test(cleanHtml) || /\brole\s*=\s*["']main["']/i.test(cleanHtml);
-  const hasNav = /<nav\b/i.test(cleanHtml) || /\brole\s*=\s*["']navigation["']/i.test(cleanHtml);
-  const hasHeader = /<header\b/i.test(cleanHtml) || /\brole\s*=\s*["']banner["']/i.test(cleanHtml);
-  const hasFooter = /<footer\b/i.test(cleanHtml) || /\brole\s*=\s*["']contentinfo["']/i.test(cleanHtml);
-  if (!hasMain && !hasNav && !hasHeader && !hasFooter) {
-    violations.push(createViolation(
-      "region-missing",
-      "moderate",
-      "WCAG 1.3.1",
-      "Page contains no HTML5 landmark elements (<main>, <nav>, <header>, <footer>) or ARIA landmark roles. Landmarks let screen reader users jump directly to major page sections.",
-      "https://dequeuniversity.com/rules/axe/4.9/region",
-      "<body>",
-      "body"
-    ));
   }
 
   // ── THIRD-PARTY / CAPTCHA ────────────────────────────────────────────────
