@@ -599,7 +599,7 @@ function analyzeAccessibility(
   const orphanRe = /<label\b[^>]*\bfor\s*=\s*["']([^"']+)["'][^>]*>/gi;
   while ((match = orphanRe.exec(cleanHtml)) !== null) {
     if (!allIds.has(match[1])) {
-      violations.push(v("label-orphaned", "error", "WCAG 1.3.1",
+      violations.push(v("label-orphaned", "alert", "WCAG 1.3.1",
         `Label has for="${match[1]}" but no element with that ID exists on this page. The label is not associated with any form control.`,
         "https://dequeuniversity.com/rules/axe/4.9/label", truncate(match[0], 200), `label[for="${match[1]}"]`));
     }
@@ -795,7 +795,7 @@ function analyzeAccessibility(
   if (mrMatch) {
     const cv = /\bcontent\s*=\s*["'](\d+)/i.exec(mrMatch[0]);
     const delay = cv ? parseInt(cv[1]) : 0;
-    violations.push(v("meta-refresh", "alert", "WCAG 2.2.1",
+    violations.push(v("meta-refresh", delay === 0 ? "error" : "alert", "WCAG 2.2.1",
       delay === 0
         ? "Page uses an instant meta refresh/redirect. This can disorient screen reader users who are mid-way through reading content."
         : `Page auto-refreshes after ${delay} seconds. Auto-refreshing pages interrupt reading and cause loss of keyboard focus.`,
