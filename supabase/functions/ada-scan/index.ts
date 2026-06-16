@@ -122,6 +122,27 @@ Deno.serve(async (req: Request) => {
 
 // ─── Multi-page scan orchestrator ───
 
+// Fetch up to this many pages simultaneously
+const CONCURRENCY = 5;
+// Skip binary/asset URLs immediately
+const NON_HTML_RE = /\.(pdf|jpg|jpeg|png|gif|svg|css|js|ico|woff2?|ttf|eot|mp4|mp3|zip|docx?|xlsx?|pptx?)$/i;
+// Tracking query params that don't change page content
+const TRACKING_PARAMS = ["utm_source","utm_medium","utm_campaign","utm_content","utm_term","ref","fbclid","gclid","source","affiliate","tracking"];
+
+function dedupeUrl(raw: string, base: string): string | null {
+  const norm = normalizeUrl(raw, base);
+  if (!norm) return null;
+  try {
+    const u = new URL(norm);
+    for (const p of TRACKING_PARAMS) u.searchParams.delete(p);
+    let s = u.toString();
+    if (s.endsWith("/") && s.length > new URL(base).origin.length + 1) s = s.slice(0, -1);
+    return s;
+  } catch {
+    return norm;
+  }
+}
+
 async function runMultiPageScan(
   supabase: ReturnType<typeof createClient>,
   scanId: string,
@@ -129,154 +150,143 @@ async function runMultiPageScan(
   maxDepth: number,
   maxPages: number
 ) {
-  const visitedUrls = new Set<string>();
-  const queuedUrls = new Set<string>();
-  const pagesToScan: { url: string; depth: number }[] = [];
-  const discoveredPages: { url: string; depth: number; title: string; html: string }[] = [];
-  let duplicatesSkipped = 0;
-
-  const normalizedRoot = normalizeUrl(rootUrl, rootUrl);
-  if (normalizedRoot) {
-    pagesToScan.push({ url: normalizedRoot, depth: 0 });
-    queuedUrls.add(normalizedRoot);
-  }
-
-  // Phase 1: Crawl and discover pages
-  while (pagesToScan.length > 0 && discoveredPages.length < maxPages) {
-    const current = pagesToScan.shift()!;
-    const normalizedUrl = normalizeUrl(current.url, rootUrl);
-
-    if (!normalizedUrl || visitedUrls.has(normalizedUrl)) {
-      duplicatesSkipped++;
-      continue;
-    }
-    if (current.depth > maxDepth) continue;
-    if (!isSameDomain(normalizedUrl, rootUrl)) continue;
-
-    if (/\.(pdf|jpg|jpeg|png|gif|svg|css|js|ico|woff|woff2|ttf|eot|mp4|mp3|zip|doc|xls)$/i.test(normalizedUrl)) {
-      continue;
-    }
-
-    visitedUrls.add(normalizedUrl);
-
-    try {
-      const pageData = await fetchPage(normalizedUrl);
-      discoveredPages.push({
-        url: normalizedUrl,
-        depth: current.depth,
-        title: pageData.title,
-        html: pageData.html,
-      });
-
-      for (const link of pageData.links) {
-        const normalized = normalizeUrl(link, rootUrl);
-        if (normalized && !queuedUrls.has(normalized) && !visitedUrls.has(normalized) && isSameDomain(normalized, rootUrl)) {
-          pagesToScan.push({ url: normalized, depth: current.depth + 1 });
-          queuedUrls.add(normalized);
-        }
-      }
-    } catch (err) {
-      console.error(`Failed to fetch ${normalizedUrl}:`, err);
-    }
-  }
-
-  console.log(`Crawl complete: ${discoveredPages.length} pages, ${duplicatesSkipped} duplicates skipped`);
-
-  await supabase
-    .from("scans")
-    .update({ total_pages: discoveredPages.length })
-    .eq("id", scanId);
-
-  // Phase 2: Analyze each page
+  const visited = new Set<string>();
+  const queue: { url: string; depth: number }[] = [];
   const allViolations: { impact: string }[] = [];
   let totalPasses = 0;
-  let pagesScanned = 0;
+  let pagesQueued = 0;   // how many pages we've dequeued and started
+  let pagesScanned = 0;  // how many pages completed without error
 
-  for (const page of discoveredPages) {
+  const root = dedupeUrl(rootUrl, rootUrl);
+  if (!root) {
+    await supabase.from("scans").update({ status: "failed", completed_at: new Date().toISOString() }).eq("id", scanId);
+    return;
+  }
+  visited.add(root);
+  queue.push({ url: root, depth: 0 });
+
+  // ── Per-page worker: fetch → discover links → analyze → write DB ──
+  const processPage = async (url: string, depth: number) => {
+    // Insert the page record early so the UI shows it immediately
     const { data: pageRecord } = await supabase
       .from("scan_pages")
-      .insert({
-        scan_id: scanId,
-        url: page.url,
-        depth: page.depth,
-        status: "running",
-        title: page.title,
-      })
-      .select()
+      .insert({ scan_id: scanId, url, depth, status: "running", title: null })
+      .select("id")
       .single();
 
-    if (!pageRecord) continue;
-
+    // Fetch the page HTML
+    let pageData: { html: string; title: string; links: string[] };
     try {
-      const analysis = analyzeAccessibility(page.html, page.url);
-      const passCount = countPasses(page.html);
-
-      const byRule: Record<string, number> = {};
-      for (const v of analysis) byRule[v.ruleId] = (byRule[v.ruleId] || 0) + 1;
-      console.log(`[SCAN] ${page.url} | violations=${analysis.length} passes=${passCount} | ${JSON.stringify(byRule)}`);
-
-      if (analysis.length > 0) {
-        const results = analysis.map((v) => ({
-          page_id: pageRecord.id,
-          scan_id: scanId,
-          impact: v.impact,
-          category: v.category,
-          rule_id: v.ruleId,
-          title: v.title,
-          description: v.description,
-          help_url: v.helpUrl,
-          element: v.element,
-          selector: v.selector,
-        }));
-
-        for (let i = 0; i < results.length; i += 50) {
-          await supabase.from("scan_results").insert(results.slice(i, i + 50));
-        }
-      }
-
-      const pageScore = calculatePageScore(analysis, passCount);
-      allViolations.push(...analysis.map((v) => ({ impact: v.impact })));
-      totalPasses += passCount;
-      pagesScanned++;
-
-      await supabase
-        .from("scan_pages")
-        .update({
-          status: "completed",
-          score: pageScore,
-          violation_count: analysis.length,
-          pass_count: passCount,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", pageRecord.id);
+      pageData = await fetchPage(url);
     } catch (err) {
-      console.error(`Failed to analyze ${page.url}:`, err);
-      await supabase
-        .from("scan_pages")
-        .update({ status: "failed", completed_at: new Date().toISOString() })
-        .eq("id", pageRecord.id);
-      pagesScanned++;
+      console.error(`Fetch failed: ${url}`, err);
+      if (pageRecord) {
+        await supabase.from("scan_pages")
+          .update({ status: "failed", completed_at: new Date().toISOString() })
+          .eq("id", pageRecord.id);
+      }
+      return;
     }
 
-    await supabase
-      .from("scans")
-      .update({ pages_scanned: pagesScanned })
-      .eq("id", scanId);
+    // Discover and enqueue new links immediately — so other workers can start on them
+    // while this worker is still doing analysis + DB writes
+    for (const link of pageData.links) {
+      const norm = dedupeUrl(link, rootUrl);
+      if (
+        norm &&
+        !visited.has(norm) &&
+        isSameDomain(norm, rootUrl) &&
+        depth + 1 <= maxDepth &&
+        !NON_HTML_RE.test(norm) &&
+        visited.size < maxPages
+      ) {
+        visited.add(norm);
+        queue.push({ url: norm, depth: depth + 1 });
+      }
+    }
+
+    if (!pageRecord) return;
+
+    // Accessibility analysis (CPU-bound, synchronous, fast)
+    const analysis = analyzeAccessibility(pageData.html, url);
+    const passCount = countPasses(pageData.html);
+    const pageScore = calculatePageScore(analysis, passCount);
+
+    // Build result rows
+    const resultRows = analysis.map((v) => ({
+      page_id: pageRecord.id,
+      scan_id: scanId,
+      impact: v.impact,
+      category: v.category,
+      rule_id: v.ruleId,
+      title: v.title,
+      description: v.description,
+      help_url: v.helpUrl,
+      element: v.element,
+      selector: v.selector,
+    }));
+
+    // Fire all DB writes in parallel: page update + all result batches at once
+    const writes: Promise<unknown>[] = [
+      supabase.from("scan_pages").update({
+        status: "completed",
+        title: pageData.title,
+        score: pageScore,
+        violation_count: analysis.length,
+        pass_count: passCount,
+        completed_at: new Date().toISOString(),
+      }).eq("id", pageRecord.id),
+    ];
+    for (let i = 0; i < resultRows.length; i += 100) {
+      writes.push(supabase.from("scan_results").insert(resultRows.slice(i, i + 100)));
+    }
+    await Promise.all(writes);
+
+    // Accumulate totals (safe — JS event loop is single-threaded between awaits)
+    allViolations.push(...analysis.map((v) => ({ impact: v.impact })));
+    totalPasses += passCount;
+    pagesScanned++;
+
+    // Throttled progress counter: write to DB every 5 pages (not every 1)
+    if (pagesScanned % 5 === 0) {
+      supabase.from("scans").update({ pages_scanned: pagesScanned }).eq("id", scanId).then(() => {});
+    }
+  };
+
+  // ── Worker pool driver ──
+  // Keeps up to CONCURRENCY workers running simultaneously.
+  // As each worker finishes it may have added new URLs to `queue`,
+  // so we immediately try to spawn replacements.
+  const activeWorkers = new Set<Promise<void>>();
+
+  const trySpawn = () => {
+    while (activeWorkers.size < CONCURRENCY && queue.length > 0 && pagesQueued < maxPages) {
+      const item = queue.shift()!;
+      pagesQueued++;
+      const p: Promise<void> = processPage(item.url, item.depth)
+        .catch((err) => console.error("Worker error:", err))
+        .finally(() => activeWorkers.delete(p)) as Promise<void>;
+      activeWorkers.add(p);
+    }
+  };
+
+  trySpawn();
+  while (activeWorkers.size > 0) {
+    await Promise.race(activeWorkers);
+    trySpawn(); // refill pool after each completion
   }
 
-  const overallScore = calculateOverallScore(allViolations, discoveredPages.length);
-
-  await supabase
-    .from("scans")
-    .update({
-      status: "completed",
-      score: overallScore,
-      total_violations: allViolations.length,
-      total_passes: totalPasses,
-      pages_scanned: pagesScanned,
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", scanId);
+  // Final scan record update
+  const overallScore = calculateOverallScore(allViolations, pagesScanned);
+  await supabase.from("scans").update({
+    status: "completed",
+    score: overallScore,
+    total_violations: allViolations.length,
+    total_passes: totalPasses,
+    total_pages: pagesScanned,
+    pages_scanned: pagesScanned,
+    completed_at: new Date().toISOString(),
+  }).eq("id", scanId);
 }
 
 // ─── URL utilities ───
@@ -313,7 +323,7 @@ async function fetchPage(url: string): Promise<{
   links: string[];
 }> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   let response: Response;
   try {
