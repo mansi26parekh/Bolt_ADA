@@ -407,6 +407,8 @@ const VIOLATION_TITLES: Record<string, string> = {
   "audio-autoplay": "Audio autoplay without controls",
   "table-fake": "Data table missing headers",
   "meta-viewport": "Zoom disabled",
+  "captcha": "Inaccessible CAPTCHA",
+  "captcha-response": "CAPTCHA response field unlabeled",
 };
 
 function createViolation(
@@ -829,6 +831,51 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
       "<meta name=\"viewport\">",
       "meta[name=viewport]"
     ));
+  }
+
+  // 19. CAPTCHA without accessible alternative
+  // Detects reCAPTCHA, hCaptcha, and Cloudflare Turnstile widgets in static HTML.
+  // CAPTCHAs are visually-dependent challenges — WCAG 1.1.1 requires a non-visual alternative.
+  const captchaPatterns = [
+    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/i, label: "Google reCAPTCHA", selector: ".g-recaptcha" },
+    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/i, label: "hCaptcha", selector: ".h-captcha" },
+    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bcf-turnstile\b[^"']*["'][^>]*>/i, label: "Cloudflare Turnstile", selector: ".cf-turnstile" },
+  ];
+  for (const cp of captchaPatterns) {
+    const captchaMatch = cp.regex.exec(html);
+    if (captchaMatch) {
+      violations.push(createViolation(
+        "captcha",
+        "serious",
+        "WCAG 1.1.1",
+        `${cp.label} widget detected. CAPTCHAs are inaccessible to users with visual or cognitive disabilities unless an audio or text-based alternative is provided.`,
+        "https://www.w3.org/TR/WCAG21/#non-text-content",
+        truncate(captchaMatch[0], 200),
+        cp.selector
+      ));
+    }
+  }
+
+  // 20. g-recaptcha-response hidden textarea — unlabeled control injected by reCAPTCHA
+  // Wave flags this as a missing label error; detect it in both static and script-injected markup.
+  const gResponseRegex = /<textarea\b[^>]*\bname\s*=\s*["']g-recaptcha-response["'][^>]*>/i;
+  const gResponseMatch = gResponseRegex.exec(html);
+  if (gResponseMatch) {
+    const tag = gResponseMatch[0];
+    const hasLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(tag) ||
+      /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag) ||
+      /\btitle\s*=\s*["'][^"']+["']/i.test(tag);
+    if (!hasLabel) {
+      violations.push(createViolation(
+        "captcha-response",
+        "serious",
+        "WCAG 1.3.1",
+        "The reCAPTCHA response textarea (g-recaptcha-response) has no accessible label. Screen readers cannot identify this field's purpose.",
+        "https://dequeuniversity.com/rules/axe/4.9/label",
+        truncate(tag, 200),
+        "textarea[name='g-recaptcha-response']"
+      ));
+    }
   }
 
   return violations;
