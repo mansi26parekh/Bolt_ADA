@@ -139,8 +139,10 @@ async function runMultiPageScan(
     queuedUrls.add(normalizedRoot);
   }
 
+  const MAX_PAGES = 3;
+
   // Phase 1: Crawl and discover pages
-  while (pagesToScan.length > 0) {
+  while (pagesToScan.length > 0 && discoveredPages.length < MAX_PAGES) {
     const current = pagesToScan.shift()!;
     const normalizedUrl = normalizeUrl(current.url, rootUrl);
 
