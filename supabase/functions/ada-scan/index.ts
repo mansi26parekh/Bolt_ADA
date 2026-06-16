@@ -85,7 +85,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const maxPages: number = body.maxPages || 50;
+      const maxPages: number = body.maxPages || Infinity;
 
       EdgeRuntime.waitUntil(
         (async () => {
