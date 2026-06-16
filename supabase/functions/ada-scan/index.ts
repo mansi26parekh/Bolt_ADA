@@ -213,6 +213,11 @@ async function runMultiPageScan(
       const analysis = analyzeAccessibility(page.html, page.url);
       const passCount = countPasses(page.html);
 
+      // Debug: log per-page breakdown
+      const byRule: Record<string, number> = {};
+      for (const v of analysis) byRule[v.ruleId] = (byRule[v.ruleId] || 0) + 1;
+      console.log(`[SCAN] ${page.url} | violations=${analysis.length} passes=${passCount} | ${JSON.stringify(byRule)}`);
+
       if (analysis.length > 0) {
         const results = analysis.map((v) => ({
           page_id: pageRecord.id,
@@ -311,14 +316,23 @@ async function fetchPage(url: string): Promise<{
   title: string;
   links: string[];
 }> {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; ADA-Scanner/2.0; +https://ada-scanner.dev)",
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-    redirect: "follow",
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ADA-Scanner/2.0; +https://ada-scanner.dev)",
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      redirect: "follow",
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} for ${url}`);
@@ -380,12 +394,17 @@ const VIOLATION_TITLES: Record<string, string> = {
   "document-title": "Missing page title",
   "label": "Missing form label",
   "button-name": "Empty button",
+  "link-name": "Empty or meaningless link",
+  "empty-heading": "Empty heading",
+  "heading-order": "Skipped heading level",
+  "frame-title": "Iframe missing title",
+  "input-image-alt": "Image input missing alt",
   "role-presentation": "Focusable with presentation role",
   "aria-hidden-focus": "Hidden but focusable",
   "duplicate-id": "Duplicate ID",
-  "video-autoplay": "Video autoplay",
-  "audio-autoplay": "Audio autoplay",
-  "table-fake": "Table missing headers",
+  "video-autoplay": "Video autoplay without controls",
+  "audio-autoplay": "Audio autoplay without controls",
+  "table-fake": "Data table missing headers",
   "meta-viewport": "Zoom disabled",
 };
 
@@ -413,21 +432,36 @@ function createViolation(
 function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
   const violations: Violation[] = [];
 
-  // Strip <script> and <style> content to avoid false positives from
-  // CSS/JS strings that look like HTML elements
   const cleanHtml = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "");
 
+  // Pre-compute positions of inputs/selects/textareas that are implicitly
+  // labeled by being a descendant of a <label> element (no `for` needed).
+  const implicitLabeledPositions = new Set<number>();
+  const labelBlockRegex = /<label\b[^>]*>[\s\S]*?<\/label>/gi;
+  let lbm: RegExpExecArray | null;
+  while ((lbm = labelBlockRegex.exec(cleanHtml)) !== null) {
+    const blockOffset = lbm.index;
+    const blockContent = lbm[0];
+    const innerRegex = /<(?:input|select|textarea)\b[^>]*>/gi;
+    let im: RegExpExecArray | null;
+    while ((im = innerRegex.exec(blockContent)) !== null) {
+      implicitLabeledPositions.add(blockOffset + im.index);
+    }
+  }
+
+  let match: RegExpExecArray | null;
+
   // 1. Images missing alt attribute
-  const imgRegex = /<img[^>]*>/gi;
-  let match;
+  const imgRegex = /<img\b[^>]*>/gi;
   while ((match = imgRegex.exec(cleanHtml)) !== null) {
     const imgTag = match[0];
     if (isInsideNoscript(cleanHtml, match.index)) continue;
-
-    if (!/alt\s*=/i.test(imgTag)) {
+    // Decorative images with role="presentation"/"none" don't need alt
+    if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(imgTag)) continue;
+    if (!/\balt\s*=/i.test(imgTag)) {
       violations.push(createViolation(
         "image-alt",
         "serious",
@@ -441,8 +475,8 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
   }
 
   // 2. Missing lang attribute on <html>
-  const htmlTag = cleanHtml.match(/<html[^>]*>/i);
-  if (htmlTag && !/lang\s*=/i.test(htmlTag[0])) {
+  const htmlTag = cleanHtml.match(/<html\b[^>]*>/i);
+  if (htmlTag && !/\blang\s*=/i.test(htmlTag[0])) {
     violations.push(createViolation(
       "html-lang-valid",
       "serious",
@@ -455,7 +489,7 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
   }
 
   // 3. Missing or empty document title
-  const titleMatch = cleanHtml.match(/<title[^>]*>([^<]*)<\/title>/i);
+  const titleMatch = cleanHtml.match(/<title\b[^>]*>([^<]*)<\/title>/i);
   if (!titleMatch || titleMatch[1].trim().length === 0) {
     violations.push(createViolation(
       "document-title",
@@ -468,31 +502,51 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     ));
   }
 
-  // 4. Form inputs without associated labels
-  const inputRegex = /<input[^>]*>/gi;
+  // Helper: check whether a form control has an accessible label
+  function controlHasLabel(tag: string, matchIndex: number): boolean {
+    if (implicitLabeledPositions.has(matchIndex)) return true;
+    // Non-empty aria-label
+    if (/\baria-label\s*=\s*["'][^"']+["']/i.test(tag)) return true;
+    // aria-labelledby referencing something
+    if (/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag)) return true;
+    // non-empty title
+    if (/\btitle\s*=\s*["'][^"']+["']/i.test(tag)) return true;
+    // <label for="id"> matching this element's id
+    const idMatch = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (idMatch) {
+      const labelRegex = new RegExp(`<label[^>]+\\bfor\\s*=\\s*["']${escapeRegex(idMatch[1])}["']`, "i");
+      if (labelRegex.test(cleanHtml)) return true;
+    }
+    return false;
+  }
+
+  // 4. Form inputs without labels
+  const inputRegex = /<input\b[^>]*>/gi;
   while ((match = inputRegex.exec(cleanHtml)) !== null) {
     const inputTag = match[0];
     if (isInsideNoscript(cleanHtml, match.index)) continue;
-
-    const typeMatch = /type\s*=\s*["']([^"']+)["']/i.exec(inputTag);
+    const typeMatch = /\btype\s*=\s*["']([^"']+)["']/i.exec(inputTag);
     const inputType = typeMatch ? typeMatch[1].toLowerCase() : "text";
-    if (["hidden", "submit", "reset", "button", "image"].includes(inputType)) continue;
 
-    const hasId = /id\s*=\s*["'][^"']+["']/i.test(inputTag);
-    const hasAriaLabel = /aria-label\s*=\s*["'][^"']+["']/i.test(inputTag);
-    const hasAriaLabelledBy = /aria-labelledby\s*=\s*["'][^"']+["']/i.test(inputTag);
-    const hasTitle = /title\s*=\s*["'][^"']+["']/i.test(inputTag);
-
-    let hasLabelFor = false;
-    if (hasId) {
-      const idMatch = /id\s*=\s*["']([^"']+)["']/i.exec(inputTag);
-      if (idMatch) {
-        const labelRegex = new RegExp(`<label[^>]+for\\s*=\\s*["']${escapeRegex(idMatch[1])}["']`, "i");
-        hasLabelFor = labelRegex.test(cleanHtml);
+    if (inputType === "image") {
+      // input[type=image] needs an alt attribute, not a label
+      if (!/\balt\s*=\s*["'][^"']*["']/i.test(inputTag)) {
+        violations.push(createViolation(
+          "input-image-alt",
+          "serious",
+          "WCAG 1.1.1",
+          "Image input button is missing an alt attribute. Screen readers cannot identify this button's purpose.",
+          "https://dequeuniversity.com/rules/axe/4.9/input-image-alt",
+          truncate(inputTag, 200),
+          buildSelector(inputTag)
+        ));
       }
+      continue;
     }
 
-    if (!hasAriaLabel && !hasAriaLabelledBy && !hasTitle && !hasLabelFor) {
+    if (["hidden", "submit", "reset", "button"].includes(inputType)) continue;
+
+    if (!controlHasLabel(inputTag, match.index)) {
       violations.push(createViolation(
         "label",
         "serious",
@@ -505,27 +559,12 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     }
   }
 
-  // 6. Select elements without labels
-  const selectRegex = /<select[^>]*>/gi;
+  // 5. Select elements without labels
+  const selectRegex = /<select\b[^>]*>/gi;
   while ((match = selectRegex.exec(cleanHtml)) !== null) {
     const selectTag = match[0];
     if (isInsideNoscript(cleanHtml, match.index)) continue;
-
-    const hasId = /id\s*=\s*["'][^"']+["']/i.test(selectTag);
-    const hasAriaLabel = /aria-label\s*=\s*["'][^"']+["']/i.test(selectTag);
-    const hasAriaLabelledBy = /aria-labelledby\s*=\s*["'][^"']+["']/i.test(selectTag);
-    const hasTitle = /title\s*=\s*["'][^"']+["']/i.test(selectTag);
-
-    let hasLabelFor = false;
-    if (hasId) {
-      const idMatch = /id\s*=\s*["']([^"']+)["']/i.exec(selectTag);
-      if (idMatch) {
-        const labelRegex = new RegExp(`<label[^>]+for\\s*=\\s*["']${escapeRegex(idMatch[1])}["']`, "i");
-        hasLabelFor = labelRegex.test(cleanHtml);
-      }
-    }
-
-    if (!hasAriaLabel && !hasAriaLabelledBy && !hasTitle && !hasLabelFor) {
+    if (!controlHasLabel(selectTag, match.index)) {
       violations.push(createViolation(
         "label",
         "serious",
@@ -538,27 +577,12 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     }
   }
 
-  // 7. Textarea elements without labels
-  const textareaRegex = /<textarea[^>]*>/gi;
+  // 6. Textarea elements without labels
+  const textareaRegex = /<textarea\b[^>]*>/gi;
   while ((match = textareaRegex.exec(cleanHtml)) !== null) {
     const textareaTag = match[0];
     if (isInsideNoscript(cleanHtml, match.index)) continue;
-
-    const hasId = /id\s*=\s*["'][^"']+["']/i.test(textareaTag);
-    const hasAriaLabel = /aria-label\s*=\s*["'][^"']+["']/i.test(textareaTag);
-    const hasAriaLabelledBy = /aria-labelledby\s*=\s*["'][^"']+["']/i.test(textareaTag);
-    const hasTitle = /title\s*=\s*["'][^"']+["']/i.test(textareaTag);
-
-    let hasLabelFor = false;
-    if (hasId) {
-      const idMatch = /id\s*=\s*["']([^"']+)["']/i.exec(textareaTag);
-      if (idMatch) {
-        const labelRegex = new RegExp(`<label[^>]+for\\s*=\\s*["']${escapeRegex(idMatch[1])}["']`, "i");
-        hasLabelFor = labelRegex.test(cleanHtml);
-      }
-    }
-
-    if (!hasAriaLabel && !hasAriaLabelledBy && !hasTitle && !hasLabelFor) {
+    if (!controlHasLabel(textareaTag, match.index)) {
       violations.push(createViolation(
         "label",
         "serious",
@@ -571,21 +595,20 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     }
   }
 
-  // 8. Buttons without accessible text
-  const buttonRegex = /<button[^>]*>([\s\S]*?)<\/button>/gi;
+  // 7. Buttons without accessible text
+  const buttonRegex = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
   while ((match = buttonRegex.exec(cleanHtml)) !== null) {
     const fullTag = match[0];
+    const openTag = fullTag.match(/<button[^>]*/i)?.[0] || "";
     const innerContent = match[1];
     if (isInsideNoscript(cleanHtml, match.index)) continue;
-
-    const hasAriaLabel = /aria-label\s*=\s*["'][^"']+["']/i.test(fullTag);
-    const hasAriaLabelledBy = /aria-labelledby\s*=\s*["'][^"']+["']/i.test(fullTag);
-    const hasTitle = /title\s*=\s*["'][^"']+["']/i.test(fullTag);
-    const hasImgWithAlt = /<img[^>]+alt\s*=\s*["'][^"']+["']/i.test(innerContent);
-    const hasSvgWithLabel = /<svg[^>]+aria-label\s*=\s*["'][^"']+["']/i.test(innerContent) ||
-      /<svg[^>]+role\s*=\s*["']img["']/i.test(innerContent);
+    const hasAriaLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag);
+    const hasAriaLabelledBy = /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag);
+    const hasTitle = /\btitle\s*=\s*["'][^"']+["']/i.test(openTag);
+    const hasImgWithAlt = /<img[^>]+\balt\s*=\s*["'][^"']+["']/i.test(innerContent);
+    const hasSvgWithLabel = /<svg[^>]+\baria-label\s*=\s*["'][^"']+["']/i.test(innerContent) ||
+      /<svg[^>]+\brole\s*=\s*["']img["']/i.test(innerContent);
     const textContent = decodeEntities(innerContent.replace(/<[^>]*>/g, "")).trim();
-
     if (!hasAriaLabel && !hasAriaLabelledBy && !hasTitle && !hasImgWithAlt && !hasSvgWithLabel && textContent.length === 0) {
       violations.push(createViolation(
         "button-name",
@@ -599,36 +622,135 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     }
   }
 
-  // 10. ARIA role on elements that shouldn't have it
-  const focusableWithPresentation = /<[^>]+role\s*=\s*["']presentation["'][^>]*tabindex\s*=\s*["'][^"']+["']/gi;
-  while ((match = focusableWithPresentation.exec(cleanHtml)) !== null) {
-    violations.push(createViolation(
-      "role-presentation",
-      "serious",
-      "WCAG 4.1.2",
-      "Element with role=\"presentation\" is focusable. This creates a confusing experience for screen reader users.",
-      "https://dequeuniversity.com/rules/axe/4.9/role-presentation",
-      truncate(match[0], 200),
-      buildSelector(match[0])
-    ));
+  // 8. Links without accessible text
+  const linkNameRegex = /<a\b[^>]*\bhref\b[^>]*>([\s\S]*?)<\/a>/gi;
+  while ((match = linkNameRegex.exec(cleanHtml)) !== null) {
+    const fullTag = match[0];
+    const openTag = fullTag.match(/<a[^>]*/i)?.[0] || "";
+    const innerContent = match[1];
+    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (/\baria-hidden\s*=\s*["']true["']/i.test(openTag)) continue;
+    const hasAriaLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag);
+    const hasAriaLabelledBy = /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag);
+    const hasTitle = /\btitle\s*=\s*["'][^"']+["']/i.test(openTag);
+    const hasImgWithAlt = /<img[^>]+\balt\s*=\s*["'][^"']+["']/i.test(innerContent);
+    const hasSvgWithLabel = /<svg[^>]+\baria-label\s*=\s*["'][^"']+["']/i.test(innerContent) ||
+      /<svg[^>]+\brole\s*=\s*["']img["']/i.test(innerContent);
+    const textContent = decodeEntities(innerContent.replace(/<[^>]*>/g, "")).trim();
+    if (!hasAriaLabel && !hasAriaLabelledBy && !hasTitle && !hasImgWithAlt && !hasSvgWithLabel && textContent.length === 0) {
+      violations.push(createViolation(
+        "link-name",
+        "serious",
+        "WCAG 4.1.2",
+        "Link has no accessible text. Screen readers cannot describe this link's purpose to users.",
+        "https://dequeuniversity.com/rules/axe/4.9/link-name",
+        truncate(fullTag, 200),
+        buildSelector(fullTag)
+      ));
+    }
   }
 
-  // 11. aria-hidden on focusable elements
-  const ariaHiddenFocusable = /<[^>]+aria-hidden\s*=\s*["']true["'][^>]*tabindex\s*=\s*["'][^"']+["']/gi;
-  while ((match = ariaHiddenFocusable.exec(cleanHtml)) !== null) {
-    violations.push(createViolation(
-      "aria-hidden-focus",
-      "serious",
-      "WCAG 4.1.2",
-      "Element with aria-hidden=\"true\" is focusable. This makes content invisible to screen readers but still keyboard-accessible, which is contradictory.",
-      "https://dequeuniversity.com/rules/axe/4.9/aria-hidden-focus",
-      truncate(match[0], 200),
-      buildSelector(match[0])
-    ));
+  // 9. Empty headings
+  const emptyHeadingRegex = /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi;
+  while ((match = emptyHeadingRegex.exec(cleanHtml)) !== null) {
+    const level = match[1];
+    const innerContent = match[2];
+    const openTag = match[0].match(/<h[^>]*/i)?.[0] || "";
+    const hasAriaLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag);
+    const hasAriaLabelledBy = /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag);
+    const textContent = decodeEntities(innerContent.replace(/<[^>]*>/g, "")).trim();
+    if (!hasAriaLabel && !hasAriaLabelledBy && textContent.length === 0) {
+      violations.push(createViolation(
+        "empty-heading",
+        "serious",
+        "WCAG 1.3.1",
+        `Heading level ${level} is empty. Empty headings confuse screen reader users who navigate by headings.`,
+        "https://dequeuniversity.com/rules/axe/4.9/empty-heading",
+        truncate(match[0], 200),
+        buildSelector(match[0])
+      ));
+    }
   }
 
-  // 12. Duplicate IDs
-  const idRegex = /id\s*=\s*["']([^"']+)["']/gi;
+  // 10. Skipped heading levels
+  const headingLevelRegex = /<h([1-6])\b[^>]*>/gi;
+  const headingLevels: number[] = [];
+  while ((match = headingLevelRegex.exec(cleanHtml)) !== null) {
+    headingLevels.push(parseInt(match[1]));
+  }
+  for (let i = 1; i < headingLevels.length; i++) {
+    if (headingLevels[i] > headingLevels[i - 1] + 1) {
+      violations.push(createViolation(
+        "heading-order",
+        "moderate",
+        "WCAG 1.3.1",
+        `Heading level skipped from h${headingLevels[i - 1]} to h${headingLevels[i]}. Heading levels should be sequential for screen reader navigation.`,
+        "https://dequeuniversity.com/rules/axe/4.9/heading-order",
+        `<h${headingLevels[i]}>`,
+        `h${headingLevels[i]}`
+      ));
+      break; // one report per page
+    }
+  }
+
+  // 11. Iframes without title
+  const iframeRegex = /<iframe\b[^>]*>/gi;
+  while ((match = iframeRegex.exec(cleanHtml)) !== null) {
+    const tag = match[0];
+    const hasTitle = /\btitle\s*=\s*["'][^"']+["']/i.test(tag);
+    const hasAriaLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(tag);
+    const hasAriaLabelledBy = /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag);
+    if (!hasTitle && !hasAriaLabel && !hasAriaLabelledBy) {
+      violations.push(createViolation(
+        "frame-title",
+        "serious",
+        "WCAG 4.1.2",
+        "Iframe does not have a title attribute. Screen readers cannot identify the purpose of this embedded frame.",
+        "https://dequeuniversity.com/rules/axe/4.9/frame-title",
+        truncate(tag, 200),
+        buildSelector(tag)
+      ));
+    }
+  }
+
+  // 12. role="presentation"/"none" on focusable elements (order-independent)
+  const rolePresentationRegex = /<(?!\/)[a-z][^>]*\brole\s*=\s*["'](?:presentation|none)["'][^>]*>/gi;
+  while ((match = rolePresentationRegex.exec(cleanHtml)) !== null) {
+    const tag = match[0];
+    const tabixMatch = /\btabindex\s*=\s*["']?(-?\d+)["']?/i.exec(tag);
+    if (tabixMatch && parseInt(tabixMatch[1]) >= 0) {
+      violations.push(createViolation(
+        "role-presentation",
+        "serious",
+        "WCAG 4.1.2",
+        "Element with role=\"presentation\" is focusable. This creates a confusing experience for screen reader users.",
+        "https://dequeuniversity.com/rules/axe/4.9/role-presentation",
+        truncate(tag, 200),
+        buildSelector(tag)
+      ));
+    }
+  }
+
+  // 13. aria-hidden="true" on focusable elements (order-independent)
+  const ariaHiddenRegex = /<(?!\/)[a-z][^>]*\baria-hidden\s*=\s*["']true["'][^>]*>/gi;
+  while ((match = ariaHiddenRegex.exec(cleanHtml)) !== null) {
+    const tag = match[0];
+    const tabixMatch = /\btabindex\s*=\s*["']?(-?\d+)["']?/i.exec(tag);
+    if (tabixMatch && parseInt(tabixMatch[1]) >= 0) {
+      violations.push(createViolation(
+        "aria-hidden-focus",
+        "serious",
+        "WCAG 4.1.2",
+        "Element with aria-hidden=\"true\" is focusable. This makes content invisible to screen readers but still keyboard-accessible, which is contradictory.",
+        "https://dequeuniversity.com/rules/axe/4.9/aria-hidden-focus",
+        truncate(tag, 200),
+        buildSelector(tag)
+      ));
+    }
+  }
+
+  // 14. Duplicate IDs
+  const idRegex = /\bid\s*=\s*["']([^"']+)["']/gi;
   const idCounts: Record<string, number> = {};
   while ((match = idRegex.exec(cleanHtml)) !== null) {
     const id = match[1];
@@ -648,8 +770,8 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     }
   }
 
-  // 15. Autoplaying video/audio without controls
-  if (/<video[^>]+autoplay/i.test(cleanHtml) && !/<video[^>]+controls/i.test(cleanHtml)) {
+  // 15. Autoplaying video without controls
+  if (/<video\b[^>]*\bautoplay\b/i.test(cleanHtml) && !/<video\b[^>]*\bcontrols\b/i.test(cleanHtml)) {
     violations.push(createViolation(
       "video-autoplay",
       "moderate",
@@ -661,7 +783,8 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     ));
   }
 
-  if (/<audio[^>]+autoplay/i.test(cleanHtml) && !/<audio[^>]+controls/i.test(cleanHtml)) {
+  // 16. Autoplaying audio without controls
+  if (/<audio\b[^>]*\bautoplay\b/i.test(cleanHtml) && !/<audio\b[^>]*\bcontrols\b/i.test(cleanHtml)) {
     violations.push(createViolation(
       "audio-autoplay",
       "moderate",
@@ -673,14 +796,14 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     ));
   }
 
-  // 16. Tables without headers
-  const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
+  // 17. Data tables without header cells
+  const tableRegex = /<table\b[^>]*>([\s\S]*?)<\/table>/gi;
   while ((match = tableRegex.exec(cleanHtml)) !== null) {
     const tableTag = match[0];
     const tableContent = match[1];
-    if (/role\s*=\s*["'](?:presentation|none)["']/i.test(tableTag)) continue;
-    if (/<th[^>]*>/i.test(tableContent)) continue;
-    const rows = tableContent.match(/<tr[^>]*>/gi) || [];
+    if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(tableTag)) continue;
+    if (/<th\b[^>]*>/i.test(tableContent)) continue;
+    const rows = tableContent.match(/<tr\b[^>]*>/gi) || [];
     if (rows.length >= 2) {
       violations.push(createViolation(
         "table-fake",
@@ -694,8 +817,8 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     }
   }
 
-  // 17. Meta viewport with user-scalable=no
-  if (/<meta[^>]+viewport[^>]+user-scalable\s*=\s*["']no["']/i.test(cleanHtml)) {
+  // 18. Meta viewport disabling zoom
+  if (/<meta\b[^>]+\bviewport\b[^>]+\buser-scalable\s*=\s*["']?no["']?/i.test(cleanHtml)) {
     violations.push(createViolation(
       "meta-viewport",
       "moderate",
@@ -838,4 +961,8 @@ function buildSelector(tag: string): string {
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cssEscape(str: string): string {
+  return str.replace(/([^\w-])/g, "\\$1");
 }
