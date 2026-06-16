@@ -400,8 +400,6 @@ const VIOLATION_TITLES: Record<string, string> = {
   "image-alt": "Missing image alternative text",
   "image-alt-empty-link": "Linked image missing alt text",
   "input-image-alt": "Image button missing alternative text",
-  "alt-suspicious": "Uninformative alternative text",
-  "alt-long": "Very long alternative text",
   "html-lang-valid": "Missing or invalid page language",
   "document-title": "Missing or empty page title",
   "label": "Missing form label",
@@ -409,7 +407,6 @@ const VIOLATION_TITLES: Record<string, string> = {
   "label-orphaned": "Orphaned form label",
   "button-name": "Empty button",
   "link-name": "Empty link",
-  "link-suspicious": "Uninformative link text",
   "empty-heading": "Empty heading",
   "heading-order": "Skipped heading level",
   "heading-missing": "No headings on page",
@@ -426,12 +423,6 @@ const VIOLATION_TITLES: Record<string, string> = {
   "audio-autoplay": "Audio autoplays without controls",
   "meta-viewport": "Page zoom disabled",
   "meta-refresh": "Timed page refresh",
-  "fieldset-missing": "Form group missing fieldset",
-  "captcha": "Inaccessible CAPTCHA",
-  "captcha-response": "CAPTCHA response field unlabeled",
-  "third-party-iframe": "Third-party embed missing title",
-  "third-party-social": "Social media widget detected",
-  "third-party-chat": "Live chat widget detected",
 };
 
 function createViolation(
@@ -501,16 +492,6 @@ function analyzeAccessibility(html: string, _pageUrl: string, preClean?: string)
   while ((_lfm = _labelForRe.exec(cleanHtml)) !== null) {
     labelForIds.add(_lfm[1]);
   }
-
-  // Pre-compute fieldset ranges for grouping checks
-  const fieldsetRanges: Array<[number, number]> = [];
-  const fieldsetBlockRegex = /<fieldset\b[^>]*>[\s\S]*?<\/fieldset>/gi;
-  let fsm: RegExpExecArray | null;
-  while ((fsm = fieldsetBlockRegex.exec(cleanHtml)) !== null) {
-    fieldsetRanges.push([fsm.index, fsm.index + fsm[0].length]);
-  }
-  const isInFieldset = (pos: number) =>
-    fieldsetRanges.some(([s, e]) => pos >= s && pos <= e);
 
   let match: RegExpExecArray | null;
 
@@ -1053,244 +1034,6 @@ function analyzeAccessibility(html: string, _pageUrl: string, preClean?: string)
       truncate(metaRefreshMatch[0], 200),
       "meta[http-equiv=refresh]"
     ));
-  }
-
-  // ── WAVE ALERTS ───────────────────────────────────────────────────────────
-
-  // 29. Suspicious / uninformative alt text (WAVE: alt_suspicious / alt_redundant)
-  const imgAltCheckRegex = /<img\b[^>]*\balt\s*=\s*["']([^"']*)["'][^>]*>/gi;
-  while ((match = imgAltCheckRegex.exec(cleanHtml)) !== null) {
-    const imgTag = match[0];
-    const altText = match[1].trim();
-    if (inNoscript(match.index)) continue;
-    if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(imgTag)) continue;
-    if (altText.length === 0) continue; // empty alt = decorative, already handled above
-
-    const isFilename = /\.(gif|jpg|jpeg|png|svg|webp|bmp|ico|tiff?)$/i.test(altText);
-    const isGeneric = /^(?:image|img|photo|photograph|picture|pic|graphic|icon|logo|spacer|bullet|btn|button|divider|separator|banner|fig(?:ure)?)s?$/i.test(altText);
-    const isGenericPhrase = /^(?:image|photo|picture|graphic|icon)\s+of\b/i.test(altText);
-
-    if (isFilename || isGeneric || isGenericPhrase) {
-      violations.push(createViolation(
-        "alt-suspicious",
-        "moderate",
-        "WCAG 1.1.1",
-        `Image alt text "${altText}" is uninformative. Alt text should describe what the image shows or its functional purpose, not use generic labels or filenames.`,
-        "https://webaim.org/techniques/alttext/",
-        truncate(imgTag, 200),
-        buildSelector(imgTag)
-      ));
-    }
-  }
-
-  // 31. Uninformative link text (WAVE: link_suspicious)
-  const SUSPICIOUS_LINK_TEXTS = new Set([
-    "click here", "click", "here", "more", "read more", "learn more",
-    "see more", "view more", "this", "link", "go", "info", "information",
-    "details", "see details", "download", "open", "start", "continue",
-    "next", "previous", "prev", "back", "forward",
-  ]);
-  const suspLinkRegex = /<a\b[^>]*\bhref\b[^>]*>([\s\S]*?)<\/a>/gi;
-  while ((match = suspLinkRegex.exec(cleanHtml)) !== null) {
-    const fullTag = match[0];
-    const openTag = fullTag.match(/<a[^>]*/i)?.[0] || "";
-    const innerContent = match[1];
-    if (inNoscript(match.index)) continue;
-    if (/\baria-label\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
-    if (/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
-    if (/\btitle\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
-    const textContent = decodeEntities(innerContent.replace(/<[^>]*>/g, "")).trim().toLowerCase();
-    if (textContent.length > 0 && SUSPICIOUS_LINK_TEXTS.has(textContent)) {
-      violations.push(createViolation(
-        "link-suspicious",
-        "moderate",
-        "WCAG 2.4.4",
-        `Link text "${textContent}" does not describe the link's destination or purpose. Screen reader users navigating links out of context cannot understand where this link leads.`,
-        "https://dequeuniversity.com/rules/axe/4.9/link-name",
-        truncate(fullTag, 200),
-        buildSelector(fullTag)
-      ));
-    }
-  }
-
-  // 33. Radio/checkbox groups missing fieldset (WAVE: fieldset_missing)
-  {
-    const rcGroups: Record<string, Array<{ tag: string; index: number; type: string }>> = {};
-    const rcRegex = /<input\b[^>]*>/gi;
-    let rcMatch: RegExpExecArray | null;
-    while ((rcMatch = rcRegex.exec(cleanHtml)) !== null) {
-      const tag = rcMatch[0];
-      const typeM = /\btype\s*=\s*["']([^"']+)["']/i.exec(tag);
-      const inputType = typeM ? typeM[1].toLowerCase() : "text";
-      if (inputType !== "radio" && inputType !== "checkbox") continue;
-      const nameM = /\bname\s*=\s*["']([^"']+)["']/i.exec(tag);
-      const groupKey = nameM ? nameM[1] : `_anon_${rcMatch.index}`;
-      if (!rcGroups[groupKey]) rcGroups[groupKey] = [];
-      rcGroups[groupKey].push({ tag, index: rcMatch.index, type: inputType });
-    }
-    const reportedGroups = new Set<string>();
-    for (const [groupName, inputs] of Object.entries(rcGroups)) {
-      if (inputs.length < 2) continue;
-      const anyOutside = inputs.some((inp) => !isInFieldset(inp.index));
-      if (anyOutside && !reportedGroups.has(groupName)) {
-        reportedGroups.add(groupName);
-        const first = inputs[0];
-        violations.push(createViolation(
-          "fieldset-missing",
-          "moderate",
-          "WCAG 1.3.1",
-          `A group of related ${first.type} inputs (name="${groupName}") is not wrapped in a <fieldset> with a <legend>. Screen readers need this context to understand how the options relate.`,
-          "https://dequeuniversity.com/rules/axe/4.9/group-missing",
-          truncate(first.tag, 200),
-          `input[type="${first.type}"][name="${groupName}"]`
-        ));
-      }
-    }
-  }
-
-  // ── THIRD-PARTY / CAPTCHA ────────────────────────────────────────────────
-
-  // 36. CAPTCHA without accessible alternative (WAVE: captcha_missing)
-  const captchaPatterns: Array<{ regex: RegExp; label: string; selector: string }> = [
-    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/i, label: "Google reCAPTCHA", selector: ".g-recaptcha" },
-    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/i, label: "hCaptcha", selector: ".h-captcha" },
-    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bcf-turnstile\b[^"']*["'][^>]*>/i, label: "Cloudflare Turnstile", selector: ".cf-turnstile" },
-    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*recaptcha[^"']*["'][^>]*>/i, label: "reCAPTCHA", selector: "[class*='recaptcha']" },
-  ];
-  const seenCaptcha = new Set<string>();
-  for (const cp of captchaPatterns) {
-    const captchaMatch = cp.regex.exec(html);
-    if (captchaMatch && !seenCaptcha.has(cp.selector)) {
-      seenCaptcha.add(cp.selector);
-      violations.push(createViolation(
-        "captcha",
-        "serious",
-        "WCAG 1.1.1",
-        `${cp.label} detected. CAPTCHAs are inaccessible to users with visual or cognitive disabilities unless an audio or text-based alternative is provided.`,
-        "https://www.w3.org/TR/WCAG21/#non-text-content",
-        truncate(captchaMatch[0], 200),
-        cp.selector
-      ));
-    }
-  }
-
-  // 37. CAPTCHA response fields without labels
-  const captchaResponseFields: Array<{ regex: RegExp; name: string; selector: string }> = [
-    { regex: /<textarea\b[^>]*\bname\s*=\s*["']g-recaptcha-response["'][^>]*>/i, name: "g-recaptcha-response", selector: "textarea[name='g-recaptcha-response']" },
-    { regex: /<textarea\b[^>]*\bname\s*=\s*["']h-captcha-response["'][^>]*>/i, name: "h-captcha-response", selector: "textarea[name='h-captcha-response']" },
-    { regex: /<input\b[^>]*\bname\s*=\s*["']cf-turnstile-response["'][^>]*>/i, name: "cf-turnstile-response", selector: "input[name='cf-turnstile-response']" },
-  ];
-  for (const field of captchaResponseFields) {
-    const fieldMatch = field.regex.exec(html);
-    if (fieldMatch) {
-      const tag = fieldMatch[0];
-      const hasLabel =
-        /\baria-label\s*=\s*["'][^"']+["']/i.test(tag) ||
-        /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag) ||
-        /\btitle\s*=\s*["'][^"']+["']/i.test(tag);
-      if (!hasLabel) {
-        violations.push(createViolation(
-          "captcha-response",
-          "serious",
-          "WCAG 1.3.1",
-          `The CAPTCHA response field (${field.name}) has no accessible label. Screen readers cannot identify this field.`,
-          "https://dequeuniversity.com/rules/axe/4.9/label",
-          truncate(tag, 200),
-          field.selector
-        ));
-      }
-    }
-  }
-
-  // 38. Third-party iframes missing accessible title (WAVE: third_party_iframe)
-  const thirdPartyIframePatterns: Array<{ regex: RegExp; label: string }> = [
-    { regex: /src\s*=\s*["'][^"']*(?:youtube\.com\/embed|youtube-nocookie\.com\/embed)[^"']*["']/i, label: "YouTube video" },
-    { regex: /src\s*=\s*["'][^"']*player\.vimeo\.com[^"']*["']/i, label: "Vimeo video" },
-    { regex: /src\s*=\s*["'][^"']*google\.com\/maps\/embed[^"']*["']/i, label: "Google Maps" },
-    { regex: /src\s*=\s*["'][^"']*calendly\.com[^"']*["']/i, label: "Calendly booking widget" },
-    { regex: /src\s*=\s*["'][^"']*typeform\.com[^"']*["']/i, label: "Typeform embed" },
-    { regex: /src\s*=\s*["'][^"']*open\.spotify\.com\/embed[^"']*["']/i, label: "Spotify player" },
-    { regex: /src\s*=\s*["'][^"']*surveymonkey\.com[^"']*["']/i, label: "SurveyMonkey embed" },
-    { regex: /src\s*=\s*["'][^"']*loom\.com\/embed[^"']*["']/i, label: "Loom video" },
-    { regex: /src\s*=\s*["'][^"']*wistia\.(?:com|net)[^"']*["']/i, label: "Wistia video" },
-  ];
-  const tpIframeRegex = /<iframe\b[^>]*>/gi;
-  while ((match = tpIframeRegex.exec(cleanHtml)) !== null) {
-    const iframeTag = match[0];
-    for (const tp of thirdPartyIframePatterns) {
-      if (tp.regex.test(iframeTag)) {
-        const hasTitle = /\btitle\s*=\s*["'][^"']+["']/i.test(iframeTag);
-        if (!hasTitle) {
-          violations.push(createViolation(
-            "third-party-iframe",
-            "serious",
-            "Third Party",
-            `${tp.label} embed is missing a title attribute. Screen readers cannot identify the purpose of this frame.`,
-            "https://dequeuniversity.com/rules/axe/4.9/frame-title",
-            truncate(iframeTag, 200),
-            "iframe[src*='embed']"
-          ));
-        }
-        break;
-      }
-    }
-  }
-
-  // 39. Social media widgets (WAVE: third_party_social)
-  const socialPatterns: Array<{ regex: RegExp; label: string; selector: string }> = [
-    { regex: /<blockquote\b[^>]+\bclass\s*=\s*["'][^"']*\btwitter-tweet\b[^"']*["'][^>]*>/i, label: "Embedded tweet (Twitter/X)", selector: "blockquote.twitter-tweet" },
-    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*\btwitter-timeline\b[^"']*["'][^>]*>/i, label: "Twitter/X timeline widget", selector: "[class*='twitter-timeline']" },
-    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bfb-(?:like|comments|page|post|video)\b[^"']*["'][^>]*>/i, label: "Facebook widget", selector: "[class*='fb-']" },
-    { regex: /<div\b[^>]+\bid\s*=\s*["']fb-root["'][^>]*>/i, label: "Facebook SDK (fb-root)", selector: "#fb-root" },
-    { regex: /<blockquote\b[^>]+\bclass\s*=\s*["'][^"']*\binstagram-media\b[^"']*["'][^>]*>/i, label: "Instagram embed", selector: "blockquote.instagram-media" },
-    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*\blinkedin[^"']*["'][^>]*>/i, label: "LinkedIn widget", selector: "[class*='linkedin']" },
-    { regex: /<[a-z][^>]+\bdata-pin-do\s*=/i, label: "Pinterest widget", selector: "[data-pin-do]" },
-    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*\btiktok-embed\b[^"']*["'][^>]*>/i, label: "TikTok embed", selector: ".tiktok-embed" },
-  ];
-  const seenSocial = new Set<string>();
-  for (const sp of socialPatterns) {
-    const socialMatch = sp.regex.exec(html);
-    if (socialMatch && !seenSocial.has(sp.selector)) {
-      seenSocial.add(sp.selector);
-      violations.push(createViolation(
-        "third-party-social",
-        "moderate",
-        "Third Party",
-        `${sp.label} detected. Third-party social media widgets may not meet WCAG 2.1 standards. Verify the widget is keyboard-navigable and screen-reader accessible.`,
-        "https://www.w3.org/WAI/WCAG21/Understanding/non-text-content.html",
-        truncate(socialMatch[0], 200),
-        sp.selector
-      ));
-    }
-  }
-
-  // 40. Live chat / support widgets (WAVE: third_party_chat)
-  const chatPatterns: Array<{ regex: RegExp; label: string }> = [
-    { regex: /src\s*=\s*["'][^"']*(?:app\.intercom\.io|widget\.intercom\.io|js\.intercomcdn\.com)[^"']*["']/i, label: "Intercom chat" },
-    { regex: /src\s*=\s*["'][^"']*js\.driftt\.com[^"']*["']/i, label: "Drift chat" },
-    { regex: /src\s*=\s*["'][^"']*static\.zdassets\.com[^"']*["']/i, label: "Zendesk chat" },
-    { regex: /src\s*=\s*["'][^"']*code\.tidio\.co[^"']*["']/i, label: "Tidio chat" },
-    { regex: /src\s*=\s*["'][^"']*js\.hs-scripts\.com[^"']*["']/i, label: "HubSpot chat" },
-    { regex: /src\s*=\s*["'][^"']*embed\.tawk\.to[^"']*["']/i, label: "Tawk.to chat" },
-    { regex: /src\s*=\s*["'][^"']*wchat\.freshchat\.com[^"']*["']/i, label: "Freshchat widget" },
-    { regex: /src\s*=\s*["'][^"']*client\.crisp\.chat[^"']*["']/i, label: "Crisp chat" },
-    { regex: /src\s*=\s*["'][^"']*cdn\.livechatinc\.com[^"']*["']/i, label: "LiveChat widget" },
-    { regex: /src\s*=\s*["'][^"']*cdn\.olark\.com[^"']*["']/i, label: "Olark chat" },
-  ];
-  const seenChat = new Set<string>();
-  for (const cp of chatPatterns) {
-    if (cp.regex.test(html) && !seenChat.has(cp.label)) {
-      seenChat.add(cp.label);
-      violations.push(createViolation(
-        "third-party-chat",
-        "moderate",
-        "Third Party",
-        `${cp.label} widget detected. Live chat widgets inject floating UI elements that may not be keyboard-accessible or properly announced by screen readers.`,
-        "https://www.w3.org/WAI/WCAG21/Understanding/keyboard.html",
-        `<script src="[${cp.label}]">`,
-        "script[src*='chat']"
-      ));
-    }
   }
 
   return violations;
