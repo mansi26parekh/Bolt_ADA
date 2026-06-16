@@ -409,6 +409,9 @@ const VIOLATION_TITLES: Record<string, string> = {
   "meta-viewport": "Zoom disabled",
   "captcha": "Inaccessible CAPTCHA",
   "captcha-response": "CAPTCHA response field unlabeled",
+  "third-party-iframe": "Third-party embed missing title",
+  "third-party-social": "Social media widget detected",
+  "third-party-chat": "Live chat widget detected",
 };
 
 function createViolation(
@@ -879,6 +882,100 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
         "https://dequeuniversity.com/rules/axe/4.9/label",
         truncate(tag, 200),
         "textarea[name='g-recaptcha-response']"
+      ));
+    }
+  }
+
+  // 21. Third-party iframes missing accessible title
+  // YouTube, Vimeo, Google Maps, Calendly, Typeform, Spotify, etc.
+  const thirdPartyIframePatterns: Array<{ regex: RegExp; label: string }> = [
+    { regex: /src\s*=\s*["'][^"']*(?:youtube\.com\/embed|youtube-nocookie\.com\/embed)[^"']*["']/i, label: "YouTube video" },
+    { regex: /src\s*=\s*["'][^"']*player\.vimeo\.com[^"']*["']/i, label: "Vimeo video" },
+    { regex: /src\s*=\s*["'][^"']*google\.com\/maps\/embed[^"']*["']/i, label: "Google Maps" },
+    { regex: /src\s*=\s*["'][^"']*calendly\.com[^"']*["']/i, label: "Calendly booking widget" },
+    { regex: /src\s*=\s*["'][^"']*typeform\.com[^"']*["']/i, label: "Typeform embed" },
+    { regex: /src\s*=\s*["'][^"']*open\.spotify\.com\/embed[^"']*["']/i, label: "Spotify player" },
+    { regex: /src\s*=\s*["'][^"']*surveymonkey\.com[^"']*["']/i, label: "SurveyMonkey embed" },
+    { regex: /src\s*=\s*["'][^"']*loom\.com\/embed[^"']*["']/i, label: "Loom video" },
+    { regex: /src\s*=\s*["'][^"']*wistia\.(?:com|net)[^"']*["']/i, label: "Wistia video" },
+  ];
+  const iframeRegex = /<iframe\b[^>]*>/gi;
+  while ((match = iframeRegex.exec(cleanHtml)) !== null) {
+    const iframeTag = match[0];
+    for (const tp of thirdPartyIframePatterns) {
+      if (tp.regex.test(iframeTag)) {
+        const hasTitle = /\btitle\s*=\s*["'][^"']+["']/i.test(iframeTag);
+        if (!hasTitle) {
+          violations.push(createViolation(
+            "third-party-iframe",
+            "serious",
+            "Third Party",
+            `${tp.label} embed is missing a title attribute. Screen readers cannot identify the purpose of this frame.`,
+            "https://dequeuniversity.com/rules/axe/4.9/frame-title",
+            truncate(iframeTag, 200),
+            "iframe[src*='" + (tp.label.toLowerCase().replace(/ /g, "")) + "']"
+          ));
+        }
+        break;
+      }
+    }
+  }
+
+  // 22. Social media widget divs/blockquotes injected by third-party scripts
+  const socialPatterns: Array<{ regex: RegExp; label: string; selector: string }> = [
+    { regex: /<blockquote\b[^>]+\bclass\s*=\s*["'][^"']*\btwitter-tweet\b[^"']*["'][^>]*>/i, label: "Embedded tweet (Twitter/X)", selector: "blockquote.twitter-tweet" },
+    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*\btwitter-timeline\b[^"']*["'][^>]*>/i, label: "Twitter/X timeline widget", selector: "[class*='twitter-timeline']" },
+    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bfb-(?:like|comments|page|post|video)\b[^"']*["'][^>]*>/i, label: "Facebook widget", selector: "[class*='fb-']" },
+    { regex: /<div\b[^>]+\bid\s*=\s*["']fb-root["'][^>]*>/i, label: "Facebook SDK (fb-root)", selector: "#fb-root" },
+    { regex: /<blockquote\b[^>]+\bclass\s*=\s*["'][^"']*\binstagram-media\b[^"']*["'][^>]*>/i, label: "Instagram embed", selector: "blockquote.instagram-media" },
+    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*\blinkedin[^"']*["'][^>]*>/i, label: "LinkedIn widget", selector: "[class*='linkedin']" },
+    { regex: /<[a-z][^>]+\bdata-pin-do\s*=/i, label: "Pinterest widget", selector: "[data-pin-do]" },
+    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*\btiktok-embed\b[^"']*["'][^>]*>/i, label: "TikTok embed", selector: ".tiktok-embed" },
+  ];
+  const seenSocial = new Set<string>();
+  for (const sp of socialPatterns) {
+    const socialMatch = sp.regex.exec(html);
+    if (socialMatch && !seenSocial.has(sp.selector)) {
+      seenSocial.add(sp.selector);
+      violations.push(createViolation(
+        "third-party-social",
+        "moderate",
+        "Third Party",
+        `${sp.label} detected. Third-party social media widgets may not meet WCAG 2.1 standards and are outside your direct control. Verify the widget is keyboard navigable and screen-reader accessible.`,
+        "https://www.w3.org/WAI/WCAG21/Understanding/non-text-content.html",
+        truncate(socialMatch[0], 200),
+        sp.selector
+      ));
+    }
+  }
+
+  // 23. Live chat / support widgets loaded via script
+  // These inject floating UI elements that are often inaccessible to keyboard and AT users.
+  // Detected from script src attributes in the raw HTML (before script tag stripping).
+  const chatPatterns: Array<{ regex: RegExp; label: string }> = [
+    { regex: /src\s*=\s*["'][^"']*(?:app\.intercom\.io|widget\.intercom\.io|js\.intercomcdn\.com)[^"']*["']/i, label: "Intercom chat" },
+    { regex: /src\s*=\s*["'][^"']*js\.driftt\.com[^"']*["']/i, label: "Drift chat" },
+    { regex: /src\s*=\s*["'][^"']*static\.zdassets\.com[^"']*["']/i, label: "Zendesk chat" },
+    { regex: /src\s*=\s*["'][^"']*code\.tidio\.co[^"']*["']/i, label: "Tidio chat" },
+    { regex: /src\s*=\s*["'][^"']*js\.hs-scripts\.com[^"']*["']/i, label: "HubSpot chat" },
+    { regex: /src\s*=\s*["'][^"']*embed\.tawk\.to[^"']*["']/i, label: "Tawk.to chat" },
+    { regex: /src\s*=\s*["'][^"']*wchat\.freshchat\.com[^"']*["']/i, label: "Freshchat widget" },
+    { regex: /src\s*=\s*["'][^"']*client\.crisp\.chat[^"']*["']/i, label: "Crisp chat" },
+    { regex: /src\s*=\s*["'][^"']*cdn\.livechatinc\.com[^"']*["']/i, label: "LiveChat widget" },
+    { regex: /src\s*=\s*["'][^"']*cdn\.olark\.com[^"']*["']/i, label: "Olark chat" },
+  ];
+  const seenChat = new Set<string>();
+  for (const cp of chatPatterns) {
+    if (cp.regex.test(html) && !seenChat.has(cp.label)) {
+      seenChat.add(cp.label);
+      violations.push(createViolation(
+        "third-party-chat",
+        "moderate",
+        "Third Party",
+        `${cp.label} widget script detected. Live chat widgets inject floating UI that may not be keyboard-accessible or properly announced by screen readers. Verify the vendor's accessibility compliance.`,
+        "https://www.w3.org/WAI/WCAG21/Understanding/keyboard.html",
+        `<script src="[${cp.label}]">`,
+        "script[src*='chat']"
       ));
     }
   }
