@@ -30,7 +30,7 @@ export interface ScanResult {
   id: string;
   page_id: string;
   scan_id: string;
-  impact: "error" | "alert" | string;
+  impact: "critical" | "serious" | "moderate" | "minor" | string;
   category: string;
   rule_id: string;
   title: string;
