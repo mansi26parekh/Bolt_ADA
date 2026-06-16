@@ -834,21 +834,26 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
   }
 
   // 19. CAPTCHA without accessible alternative
-  // Detects reCAPTCHA, hCaptcha, and Cloudflare Turnstile widgets in static HTML.
+  // Detects reCAPTCHA, hCaptcha, Cloudflare Turnstile, and any custom recaptcha placeholder
+  // class names (e.g. "recaptcha-fit") used by JS-rendered widgets.
   // CAPTCHAs are visually-dependent challenges — WCAG 1.1.1 requires a non-visual alternative.
   const captchaPatterns = [
-    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/i, label: "Google reCAPTCHA", selector: ".g-recaptcha" },
-    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/i, label: "hCaptcha", selector: ".h-captcha" },
-    { regex: /<div\b[^>]+\bclass\s*=\s*["'][^"']*\bcf-turnstile\b[^"']*["'][^>]*>/i, label: "Cloudflare Turnstile", selector: ".cf-turnstile" },
+    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/i, label: "Google reCAPTCHA", selector: ".g-recaptcha" },
+    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/i, label: "hCaptcha", selector: ".h-captcha" },
+    { regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bcf-turnstile\b[^"']*["'][^>]*>/i, label: "Cloudflare Turnstile", selector: ".cf-turnstile" },
+    // Catch any element whose class contains "recaptcha" (e.g. recaptcha-fit, recaptcha-wrapper)
+    { regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*recaptcha[^"']*["'][^>]*>/i, label: "reCAPTCHA placeholder", selector: "[class*='recaptcha']" },
   ];
+  const seenCaptcha = new Set<string>();
   for (const cp of captchaPatterns) {
     const captchaMatch = cp.regex.exec(html);
-    if (captchaMatch) {
+    if (captchaMatch && !seenCaptcha.has(cp.selector)) {
+      seenCaptcha.add(cp.selector);
       violations.push(createViolation(
         "captcha",
         "serious",
         "WCAG 1.1.1",
-        `${cp.label} widget detected. CAPTCHAs are inaccessible to users with visual or cognitive disabilities unless an audio or text-based alternative is provided.`,
+        `${cp.label} detected. CAPTCHAs are inaccessible to users with visual or cognitive disabilities unless an audio or text-based alternative is provided.`,
         "https://www.w3.org/TR/WCAG21/#non-text-content",
         truncate(captchaMatch[0], 200),
         cp.selector
