@@ -25,11 +25,11 @@ interface ResultsDashboardProps {
 type ImpactLevel = "critical" | "serious" | "moderate" | "minor";
 type Tab = "overview" | "pages" | "violations";
 
-const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: string; bg: string; label: string }> = {
-  critical: { icon: AlertOctagon, color: "text-red-400", bg: "bg-red-500/10", label: "Critical" },
-  serious: { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-500/10", label: "Serious" },
-  moderate: { icon: AlertCircle, color: "text-amber-400", bg: "bg-amber-500/10", label: "Moderate" },
-  minor: { icon: Info, color: "text-blue-400", bg: "bg-blue-500/10", label: "Minor" },
+const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: string; bg: string; badge: string; border: string; label: string }> = {
+  critical: { icon: AlertOctagon, color: "text-red-400", bg: "bg-red-500/10", badge: "bg-red-500/20 text-red-300 border border-red-500/30", border: "border-l-2 border-l-red-500/60", label: "Critical" },
+  serious: { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-500/10", badge: "bg-orange-500/20 text-orange-300 border border-orange-500/30", border: "border-l-2 border-l-orange-500/60", label: "Serious" },
+  moderate: { icon: AlertCircle, color: "text-amber-400", bg: "bg-amber-500/10", badge: "bg-amber-500/20 text-amber-300 border border-amber-500/30", border: "border-l-2 border-l-amber-500/60", label: "Moderate" },
+  minor: { icon: Info, color: "text-blue-400", bg: "bg-blue-500/10", badge: "bg-blue-500/20 text-blue-300 border border-blue-500/30", border: "border-l-2 border-l-blue-500/60", label: "Minor" },
 };
 
 export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
@@ -326,20 +326,20 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                         const groupKey = `${page.id}:${ruleId}`;
                         const groupExpanded = expandedViolations.has(groupKey);
                         return (
-                          <div key={ruleId} className="rounded-lg overflow-hidden border border-slate-700/40">
+                          <div key={ruleId} className={`rounded-lg overflow-hidden border border-slate-700/40 ${config.border}`}>
                             {/* Rule row — count + title */}
                             <button
                               onClick={() => toggleViolation(groupKey)}
-                              className="w-full px-3 py-2 flex items-center gap-2.5 text-left hover:bg-slate-700/20 transition-colors bg-slate-900/50"
+                              className="w-full px-3 py-2.5 flex items-center gap-2.5 text-left hover:bg-slate-700/30 transition-colors bg-slate-900/70"
                             >
                               <config.icon className={`w-3.5 h-3.5 ${config.color} shrink-0`} />
                               <span className={`text-xs font-bold tabular-nums ${config.color} shrink-0`}>
                                 {group.length}
                               </span>
-                              <span className="text-xs font-medium text-slate-300 flex-1 min-w-0 truncate">
+                              <span className="text-xs font-medium text-slate-200 flex-1 min-w-0 truncate">
                                 {group[0].title}
                               </span>
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${config.bg} ${config.color}`}>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${config.badge}`}>
                                 {config.label}
                               </span>
                               {groupExpanded ? (
@@ -449,7 +449,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-200">{result.title}</p>
                         <div className="flex items-center gap-2 mt-1.5">
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.color}`}>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.badge}`}>
                             {config.label}
                           </span>
                           <span className="text-[10px] text-slate-600">{result.category}</span>
