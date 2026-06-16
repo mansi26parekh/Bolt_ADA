@@ -318,7 +318,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                           return acc;
                         }, {})
                       ).map(([ruleId, group]) => {
-                        const config = impactConfig[group[0].impact as ImpactLevel];
+                        const config = impactConfig[group[0].impact as ImpactLevel] ?? impactConfig.error;
                         const groupKey = `${page.id}:${ruleId}`;
                         const groupExpanded = expandedViolations.has(groupKey);
                         return (
@@ -430,7 +430,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                 </div>
               )}
               {filteredResults.map((result) => {
-                const config = impactConfig[result.impact as ImpactLevel];
+                const config = impactConfig[result.impact as ImpactLevel] ?? impactConfig.error;
                 const isExpanded = expandedViolations.has(result.id);
                 return (
                   <div
