@@ -208,8 +208,12 @@ async function runMultiPageScan(
     if (!pageRecord) return;
 
     // Accessibility analysis (CPU-bound, synchronous, fast)
-    const analysis = analyzeAccessibility(pageData.html, url);
-    const passCount = countPasses(pageData.html);
+    const cleanHtml = pageData.html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "");
+    const analysis = analyzeAccessibility(pageData.html, url, cleanHtml);
+    const passCount = countPasses(cleanHtml);
     const pageScore = calculatePageScore(analysis, passCount);
 
     // Build result rows
@@ -455,13 +459,22 @@ function createViolation(
   };
 }
 
-function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
+function analyzeAccessibility(html: string, _pageUrl: string, preClean?: string): Violation[] {
   const violations: Violation[] = [];
 
-  const cleanHtml = html
+  const cleanHtml = preClean ?? html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "");
+
+  // Pre-compute noscript ranges once — avoids O(n) substring + regex per element
+  const noscriptRanges: Array<[number, number]> = [];
+  const _nscriptRe = /<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi;
+  let _nsm: RegExpExecArray | null;
+  while ((_nsm = _nscriptRe.exec(cleanHtml)) !== null) {
+    noscriptRanges.push([_nsm.index, _nsm.index + _nsm[0].length]);
+  }
+  const inNoscript = (pos: number) => noscriptRanges.some(([s, e]) => pos >= s && pos <= e);
 
   // Pre-compute all document IDs for ARIA reference validation
   const allIds = new Set<string>();
@@ -485,6 +498,14 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
     }
   }
 
+  // Pre-compute label for= targets — avoids compiling a new regex per form control
+  const labelForIds = new Set<string>();
+  const _labelForRe = /<label\b[^>]*\bfor\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let _lfm: RegExpExecArray | null;
+  while ((_lfm = _labelForRe.exec(cleanHtml)) !== null) {
+    labelForIds.add(_lfm[1]);
+  }
+
   // Pre-compute fieldset ranges for grouping checks
   const fieldsetRanges: Array<[number, number]> = [];
   const fieldsetBlockRegex = /<fieldset\b[^>]*>[\s\S]*?<\/fieldset>/gi;
@@ -504,10 +525,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
     if (/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag)) return true;
     if (/\btitle\s*=\s*["'][^"']+["']/i.test(tag)) return true;
     const idMatch = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
-    if (idMatch) {
-      const labelRegex = new RegExp(`<label[^>]+\\bfor\\s*=\\s*["']${escapeRegex(idMatch[1])}["']`, "i");
-      if (labelRegex.test(cleanHtml)) return true;
-    }
+    if (idMatch && labelForIds.has(idMatch[1])) return true;
     return false;
   }
 
@@ -517,7 +535,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
   const imgRegex = /<img\b[^>]*>/gi;
   while ((match = imgRegex.exec(cleanHtml)) !== null) {
     const imgTag = match[0];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(imgTag)) continue;
     if (!/\balt\s*=/i.test(imgTag)) {
       violations.push(createViolation(
@@ -538,7 +556,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
     const fullTag = match[0];
     const openTag = fullTag.match(/<a[^>]*/i)?.[0] || "";
     const innerContent = match[1];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     if (/\baria-label\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
     if (/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
     if (/\btitle\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
@@ -594,7 +612,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
   const inputRegex = /<input\b[^>]*>/gi;
   while ((match = inputRegex.exec(cleanHtml)) !== null) {
     const inputTag = match[0];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     const typeMatch = /\btype\s*=\s*["']([^"']+)["']/i.exec(inputTag);
     const inputType = typeMatch ? typeMatch[1].toLowerCase() : "text";
 
@@ -632,7 +650,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
   const selectRegex = /<select\b[^>]*>/gi;
   while ((match = selectRegex.exec(cleanHtml)) !== null) {
     const selectTag = match[0];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     if (!controlHasLabel(selectTag, match.index)) {
       violations.push(createViolation(
         "label",
@@ -650,7 +668,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
   const textareaRegex = /<textarea\b[^>]*>/gi;
   while ((match = textareaRegex.exec(cleanHtml)) !== null) {
     const textareaTag = match[0];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     if (!controlHasLabel(textareaTag, match.index)) {
       violations.push(createViolation(
         "label",
@@ -708,7 +726,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
     const fullTag = match[0];
     const openTag = fullTag.match(/<button[^>]*/i)?.[0] || "";
     const innerContent = match[1];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     const hasAriaLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag);
     const hasAriaLabelledBy = /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag);
     const hasTitle = /\btitle\s*=\s*["'][^"']+["']/i.test(openTag);
@@ -736,7 +754,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
     const fullTag = match[0];
     const openTag = fullTag.match(/<a[^>]*/i)?.[0] || "";
     const innerContent = match[1];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     if (/\baria-hidden\s*=\s*["']true["']/i.test(openTag)) continue;
     const hasAriaLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag);
     const hasAriaLabelledBy = /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag);
@@ -1067,7 +1085,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
   while ((match = imgAltCheckRegex.exec(cleanHtml)) !== null) {
     const imgTag = match[0];
     const altText = match[1].trim();
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(imgTag)) continue;
     if (altText.length === 0) continue; // empty alt = decorative, already handled above
 
@@ -1093,7 +1111,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
   while ((match = imgAltLongRegex.exec(cleanHtml)) !== null) {
     const imgTag = match[0];
     const altText = match[1];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     violations.push(createViolation(
       "alt-long",
       "minor",
@@ -1117,7 +1135,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
     const fullTag = match[0];
     const openTag = fullTag.match(/<a[^>]*/i)?.[0] || "";
     const innerContent = match[1];
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     if (/\baria-label\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
     if (/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
     if (/\btitle\s*=\s*["'][^"']+["']/i.test(openTag)) continue;
@@ -1141,7 +1159,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
     const fullTagStart = match[0];
     const href = match[1];
     const ext = href.split(".").pop()?.toLowerCase() || "";
-    if (isInsideNoscript(cleanHtml, match.index)) continue;
+    if (inNoscript(match.index)) continue;
     violations.push(createViolation(
       "link-document",
       "minor",
@@ -1372,12 +1390,7 @@ function analyzeAccessibility(html: string, _pageUrl: string): Violation[] {
 
 // ─── Pass counting (mirrors WAVE "features" category) ───
 
-function countPasses(html: string): number {
-  const cleanHtml = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "");
-
+function countPasses(cleanHtml: string): number {
   let passes = 0;
 
   // Images with meaningful alt text
@@ -1495,13 +1508,6 @@ function calculateOverallScore(
 }
 
 // ─── Helpers ───
-
-function isInsideNoscript(html: string, tagIndex: number): boolean {
-  const before = html.substring(0, tagIndex);
-  const noscriptOpens = (before.match(/<noscript/gi) || []).length;
-  const noscriptCloses = (before.match(/<\/noscript/gi) || []).length;
-  return noscriptOpens > noscriptCloses;
-}
 
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
