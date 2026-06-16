@@ -836,47 +836,30 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
     ));
   }
 
-  // 19 & 20. CAPTCHA detection — widget presence + injected unlabeled form field
-  // Each CAPTCHA widget (reCAPTCHA, hCaptcha, Turnstile) injects a hidden response
-  // field at runtime that has no label. Wave flags both the widget AND the field.
-  // We fire both violations whenever the widget container is detected in static HTML,
-  // because the injected field won't appear in a plain HTTP fetch.
-  const captchaPatterns: Array<{
-    regex: RegExp; label: string; selector: string;
-    fieldSelector: string; fieldName: string;
-  }> = [
+  // 19. CAPTCHA without accessible alternative
+  const captchaPatterns: Array<{ regex: RegExp; label: string; selector: string }> = [
     {
       regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/i,
       label: "Google reCAPTCHA", selector: ".g-recaptcha",
-      fieldSelector: "textarea[name='g-recaptcha-response']", fieldName: "g-recaptcha-response",
     },
     {
       regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/i,
       label: "hCaptcha", selector: ".h-captcha",
-      fieldSelector: "textarea[name='h-captcha-response']", fieldName: "h-captcha-response",
     },
     {
       regex: /<(?:div|section|span)\b[^>]+\bclass\s*=\s*["'][^"']*\bcf-turnstile\b[^"']*["'][^>]*>/i,
       label: "Cloudflare Turnstile", selector: ".cf-turnstile",
-      fieldSelector: "input[name='cf-turnstile-response']", fieldName: "cf-turnstile-response",
     },
-    // Any element whose class contains "recaptcha" (e.g. recaptcha-fit, recaptcha-wrapper)
     {
       regex: /<[a-z][^>]+\bclass\s*=\s*["'][^"']*recaptcha[^"']*["'][^>]*>/i,
       label: "reCAPTCHA placeholder", selector: "[class*='recaptcha']",
-      fieldSelector: "textarea[name='g-recaptcha-response']", fieldName: "g-recaptcha-response",
     },
   ];
 
   const seenCaptcha = new Set<string>();
-  const seenCaptchaField = new Set<string>();
-
   for (const cp of captchaPatterns) {
     const captchaMatch = cp.regex.exec(html);
-    if (!captchaMatch) continue;
-
-    // Violation 1: inaccessible CAPTCHA (one per widget type)
-    if (!seenCaptcha.has(cp.selector)) {
+    if (captchaMatch && !seenCaptcha.has(cp.selector)) {
       seenCaptcha.add(cp.selector);
       violations.push(createViolation(
         "captcha",
@@ -888,21 +871,42 @@ function analyzeAccessibility(html: string, pageUrl: string): Violation[] {
         cp.selector
       ));
     }
+  }
 
-    // Violation 2: missing form label for the injected response field.
-    // Fire proactively — Wave flags this even when the field is JS-injected,
-    // so we don't wait for it to appear in static HTML.
-    if (!seenCaptchaField.has(cp.fieldName)) {
-      seenCaptchaField.add(cp.fieldName);
-      violations.push(createViolation(
-        "captcha-response",
-        "serious",
-        "WCAG 1.3.1",
-        `${cp.label} injects a form field (${cp.fieldName}) with no accessible label. Screen readers and Wave flag this as a missing form label because the injected input is never associated with a <label> element.`,
-        "https://dequeuniversity.com/rules/axe/4.9/label",
-        `<textarea name="${cp.fieldName}"></textarea>`,
-        cp.fieldSelector
-      ));
+  // 20. CAPTCHA response fields present in HTML — only flag when the field is actually found
+  // and lacks an accessible label. Does not fire on widget presence alone.
+  const captchaResponseFields: Array<{ regex: RegExp; name: string; selector: string }> = [
+    {
+      regex: /<textarea\b[^>]*\bname\s*=\s*["']g-recaptcha-response["'][^>]*>/i,
+      name: "g-recaptcha-response", selector: "textarea[name='g-recaptcha-response']",
+    },
+    {
+      regex: /<textarea\b[^>]*\bname\s*=\s*["']h-captcha-response["'][^>]*>/i,
+      name: "h-captcha-response", selector: "textarea[name='h-captcha-response']",
+    },
+    {
+      regex: /<input\b[^>]*\bname\s*=\s*["']cf-turnstile-response["'][^>]*>/i,
+      name: "cf-turnstile-response", selector: "input[name='cf-turnstile-response']",
+    },
+  ];
+  for (const field of captchaResponseFields) {
+    const fieldMatch = field.regex.exec(html);
+    if (fieldMatch) {
+      const tag = fieldMatch[0];
+      const hasLabel = /\baria-label\s*=\s*["'][^"']+["']/i.test(tag) ||
+        /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag) ||
+        /\btitle\s*=\s*["'][^"']+["']/i.test(tag);
+      if (!hasLabel) {
+        violations.push(createViolation(
+          "captcha-response",
+          "serious",
+          "WCAG 1.3.1",
+          `The CAPTCHA response field (${field.name}) has no accessible label. Screen readers cannot identify this field's purpose.`,
+          "https://dequeuniversity.com/rules/axe/4.9/label",
+          truncate(tag, 200),
+          field.selector
+        ));
+      }
     }
   }
 
