@@ -85,10 +85,12 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      const maxPages: number = body.maxPages || 50;
+
       EdgeRuntime.waitUntil(
         (async () => {
           try {
-            await runMultiPageScan(supabase, scan.id, targetUrl, maxDepth);
+            await runMultiPageScan(supabase, scan.id, targetUrl, maxDepth, maxPages);
           } catch (err) {
             console.error("Scan failed:", err);
             await supabase
@@ -124,7 +126,8 @@ async function runMultiPageScan(
   supabase: ReturnType<typeof createClient>,
   scanId: string,
   rootUrl: string,
-  maxDepth: number
+  maxDepth: number,
+  maxPages: number
 ) {
   const visitedUrls = new Set<string>();
   const queuedUrls = new Set<string>(); // Track URLs scheduled for crawling
@@ -139,10 +142,8 @@ async function runMultiPageScan(
     queuedUrls.add(normalizedRoot);
   }
 
-  const MAX_PAGES = body.maxPages || 50;
-
   // Phase 1: Crawl and discover pages
-  while (pagesToScan.length > 0 && discoveredPages.length < MAX_PAGES) {
+  while (pagesToScan.length > 0 && discoveredPages.length < maxPages) {
     const current = pagesToScan.shift()!;
     const normalizedUrl = normalizeUrl(current.url, rootUrl);
 
