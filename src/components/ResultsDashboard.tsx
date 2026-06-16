@@ -314,56 +314,79 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                     )}
                   </button>
                   {isExpanded && pageViolations.length > 0 && (
-                    <div className="border-t border-slate-800/50 bg-slate-800/30 p-3 space-y-2">
-                      {pageViolations.map((result) => {
-                        const config = impactConfig[result.impact as ImpactLevel];
-                        const violationExpanded = expandedViolations.has(result.id);
+                    <div className="border-t border-slate-800/50 bg-slate-800/30 p-3 space-y-1.5">
+                      {/* Group by rule_id, WAVE-style */}
+                      {Object.entries(
+                        pageViolations.reduce<Record<string, typeof pageViolations>>((acc, r) => {
+                          (acc[r.rule_id] ??= []).push(r);
+                          return acc;
+                        }, {})
+                      ).map(([ruleId, group]) => {
+                        const config = impactConfig[group[0].impact as ImpactLevel];
+                        const groupKey = `${page.id}:${ruleId}`;
+                        const groupExpanded = expandedViolations.has(groupKey);
                         return (
-                          <div
-                            key={result.id}
-                            className="bg-slate-900/70 border border-slate-700/50 rounded-lg overflow-hidden"
-                          >
+                          <div key={ruleId} className="rounded-lg overflow-hidden border border-slate-700/40">
+                            {/* Rule row — count + title */}
                             <button
-                              onClick={() => toggleViolation(result.id)}
-                              className="w-full p-3 flex items-start gap-2 text-left hover:bg-slate-700/20 transition-colors"
+                              onClick={() => toggleViolation(groupKey)}
+                              className="w-full px-3 py-2 flex items-center gap-2.5 text-left hover:bg-slate-700/20 transition-colors bg-slate-900/50"
                             >
-                              <config.icon className={`w-3.5 h-3.5 ${config.color} shrink-0 mt-0.5`} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-slate-300 truncate">{result.title}</p>
-                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.color}`}>
-                                  {config.label}
-                                </span>
-                              </div>
-                              {violationExpanded ? (
+                              <config.icon className={`w-3.5 h-3.5 ${config.color} shrink-0`} />
+                              <span className={`text-xs font-bold tabular-nums ${config.color} shrink-0`}>
+                                {group.length}
+                              </span>
+                              <span className="text-xs font-medium text-slate-300 flex-1 min-w-0 truncate">
+                                {group[0].title}
+                              </span>
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${config.bg} ${config.color}`}>
+                                {config.label}
+                              </span>
+                              {groupExpanded ? (
                                 <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
                               ) : (
                                 <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" />
                               )}
                             </button>
-                            {violationExpanded && (
-                              <div className="px-3 pb-3 pl-8 space-y-2">
-                                <p className="text-[11px] text-slate-400">{result.description}</p>
-                                {result.element && (
-                                  <code className="text-[10px] text-slate-400 bg-slate-800/50 px-2 py-1 rounded block break-all">
-                                    {result.element}
-                                  </code>
-                                )}
-                                {result.help_url && (
-                                  <a
-                                    href={result.help_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
-                                  >
-                                    Learn how to fix
-                                    <ExternalLink className="w-2.5 h-2.5" />
-                                  </a>
-                                )}
+                            {/* Individual instances */}
+                            {groupExpanded && (
+                              <div className="divide-y divide-slate-800/50">
+                                {group.map((result, idx) => (
+                                  <div key={result.id} className="px-3 py-2 pl-9 bg-slate-900/70 space-y-1.5">
+                                    <p className="text-[10px] text-slate-500 font-medium">Instance {idx + 1}</p>
+                                    <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
+                                    {result.element && (
+                                      <code className="text-[10px] text-slate-400 bg-slate-800/60 px-2 py-1 rounded block break-all font-mono">
+                                        {result.element}
+                                      </code>
+                                    )}
+                                    {result.selector && (
+                                      <p className="text-[10px] text-slate-500 font-mono">{result.selector}</p>
+                                    )}
+                                    {result.help_url && (
+                                      <a
+                                        href={result.help_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                                      >
+                                        Learn how to fix
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                  {isExpanded && pageViolations.length === 0 && (
+                    <div className="border-t border-slate-800/50 bg-slate-800/30 px-4 py-5 flex items-center gap-2 text-emerald-400">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-medium">No violations found on this page</span>
                     </div>
                   )}
                 </div>
