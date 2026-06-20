@@ -22,7 +22,7 @@ export function useScan() {
           "apikey": ANON_KEY,
           "Authorization": `Bearer ${ANON_KEY}`,
         },
-        body: JSON.stringify({ url, maxDepth }),
+        body: JSON.stringify({ url, maxDepth, maxPages: 3 }),
       });
 
       if (!response.ok) {
