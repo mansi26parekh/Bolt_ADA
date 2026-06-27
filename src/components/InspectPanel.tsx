@@ -310,19 +310,35 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
           )}
         </div>
 
-        {/* Right: details panel */}
-        <div className="w-[380px] shrink-0 border-l border-slate-800 flex flex-col bg-slate-950 overflow-hidden">
+        {/* Right: details panel — revealed only after highlight resolves */}
+        <div
+          className={`shrink-0 border-l border-slate-700/60 flex flex-col overflow-hidden
+            transition-all duration-500 ease-out
+            ${(status === "ready" || status === "not-found")
+              ? "w-[400px] opacity-100 translate-x-0"
+              : "w-0 opacity-0 translate-x-8 pointer-events-none"
+            }`}
+          style={{ background: "linear-gradient(160deg, #0f172a 0%, #0d1c2e 60%, #0f1a2b 100%)" }}
+        >
+          {/* Coloured top stripe matching severity */}
+          <div className={`h-0.5 w-full shrink-0 ${
+            result.impact === "critical" ? "bg-gradient-to-r from-red-500 to-red-400" :
+            result.impact === "serious"  ? "bg-gradient-to-r from-orange-500 to-orange-400" :
+            result.impact === "moderate" ? "bg-gradient-to-r from-amber-500 to-amber-400" :
+                                           "bg-gradient-to-r from-blue-500 to-blue-400"
+          }`} />
+
           {/* Panel header */}
-          <div className="px-4 py-3 border-b border-slate-800 shrink-0">
+          <div className="px-4 py-3 border-b border-slate-700/40 shrink-0">
             <div className="flex items-start gap-2">
               <config.icon className={`w-4 h-4 ${config.color} shrink-0 mt-0.5`} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-white leading-snug">{result.title}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1.5">
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.badge}`}>
                     {config.label}
                   </span>
-                  <span className="text-[10px] text-slate-500">{result.category}</span>
+                  <span className="text-[10px] text-slate-400">{result.category}</span>
                 </div>
               </div>
             </div>
@@ -333,7 +349,7 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
 
             {/* Description */}
             <section>
-              <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />Issue
               </h3>
               <p className="text-[11px] text-slate-300 leading-relaxed">{result.description}</p>
@@ -343,16 +359,16 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
             {result.element && (
               <section>
                 <div className="flex items-center justify-between mb-1.5">
-                  <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                     <Code2 className="w-3 h-3" />Affected HTML
                   </h3>
                   <CopyButton text={result.element} label="HTML" />
                 </div>
-                <div className="relative">
-                  <pre className="text-[10px] text-red-300 bg-red-500/5 border border-red-500/20 px-2.5 py-2 rounded-lg overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">
+                <div className="relative rounded-lg overflow-hidden border border-red-500/25">
+                  <pre className="text-[10px] text-red-300 bg-red-950/30 px-3 py-2.5 overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">
                     {result.element}
                   </pre>
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500/40 rounded-b-lg" />
+                  <div className="absolute bottom-0 left-0 right-0 h-px bg-red-500/30" />
                 </div>
               </section>
             )}
@@ -361,10 +377,10 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
             {selector && (
               <section>
                 <div className="flex items-center justify-between mb-1.5">
-                  <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CSS Selector</h3>
+                  <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">CSS Selector</h3>
                   <CopyButton text={selector} label="Selector" />
                 </div>
-                <code className="text-[10px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 px-2.5 py-2 rounded-lg block font-mono break-all">
+                <code className="text-[10px] text-emerald-300 bg-emerald-950/30 border border-emerald-500/20 px-3 py-2 rounded-lg block font-mono break-all">
                   {selector}
                 </code>
               </section>
@@ -373,20 +389,20 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
             {/* Recommended Fix */}
             <section>
               <div className="flex items-center justify-between mb-1.5">
-                <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Lightbulb className="w-3 h-3 text-amber-400" />Recommended Fix
                 </h3>
                 <CopyButton text={fix.code} label="Fix code" />
               </div>
-              <p className="text-[10px] text-slate-400 mb-1.5 leading-relaxed">{fix.summary}</p>
-              <pre className="text-[10px] text-emerald-300 bg-slate-900 border border-slate-700 px-2.5 py-2 rounded-lg overflow-x-auto whitespace-pre font-mono leading-relaxed">
+              <p className="text-[10px] text-slate-400 mb-2 leading-relaxed">{fix.summary}</p>
+              <pre className="text-[10px] text-emerald-300 bg-slate-900/70 border border-slate-700/60 px-3 py-2.5 rounded-lg overflow-x-auto whitespace-pre font-mono leading-relaxed">
                 {fix.code}
               </pre>
             </section>
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-2.5 border-t border-slate-800 shrink-0 flex items-center gap-3">
+          <div className="px-4 py-2.5 border-t border-slate-700/40 shrink-0 flex items-center gap-3 bg-slate-900/30">
             {result.help_url && (
               <a
                 href={result.help_url}
