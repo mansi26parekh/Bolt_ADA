@@ -182,8 +182,43 @@ interface PreviewModalProps {
 function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [status, setStatus] = useState<PreviewStatus>("loading");
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const proxyUrl = `${PROXY_BASE}?url=${encodeURIComponent(pageUrl)}`;
+  // Fetch the proxied HTML as text → Blob URL so the iframe never connects
+  // directly to the edge function domain (avoids sandbox iframe restrictions).
+  useEffect(() => {
+    let revoked = false;
+    let currentBlob: string | null = null;
+
+    const load = async () => {
+      try {
+        const res = await fetch(
+          `${PROXY_BASE}?url=${encodeURIComponent(pageUrl)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+          }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+        if (revoked) return;
+        const blob = new Blob([html], { type: "text/html; charset=utf-8" });
+        currentBlob = URL.createObjectURL(blob);
+        setBlobUrl(currentBlob);
+      } catch (err) {
+        if (!revoked) setFetchError(String(err));
+      }
+    };
+
+    load();
+
+    return () => {
+      revoked = true;
+      if (currentBlob) URL.revokeObjectURL(currentBlob);
+    };
+  }, [pageUrl]);
 
   const sendHighlight = useCallback(() => {
     if (!selector || !iframeRef.current?.contentWindow) return;
@@ -195,10 +230,7 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      if (e.data?.type === "ada-ready") {
-        setStatus("loading"); // briefly stay loading while we send the message
-        sendHighlight();
-      }
+      if (e.data?.type === "ada-ready") sendHighlight();
       if (e.data?.type === "ada-found") setStatus("ready");
       if (e.data?.type === "ada-not-found") setStatus("not-found");
     };
@@ -217,7 +249,7 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
       {/* Toolbar */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-slate-800 shrink-0 bg-slate-950">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <div className={`w-2 h-2 rounded-full ${status === "ready" ? "bg-emerald-400" : "bg-red-500 animate-pulse"}`} />
           <span className="text-xs font-semibold text-white">Live Inspect</span>
         </div>
 
@@ -226,24 +258,27 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
           <span className="text-xs text-slate-400 truncate">{pageUrl}</span>
         </div>
 
-        {status === "loading" && (
+        {fetchError ? (
+          <span className="flex items-center gap-1.5 text-[11px] text-red-400 shrink-0">
+            <AlertCircleIcon className="w-3 h-3" />
+            Failed to load page
+          </span>
+        ) : status === "loading" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-slate-400 shrink-0">
             <Loader2 className="w-3 h-3 animate-spin" />
-            Locating element…
+            {blobUrl ? "Locating element…" : "Fetching page…"}
           </span>
-        )}
-        {status === "ready" && (
+        ) : status === "ready" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-emerald-400 shrink-0">
             <Check className="w-3 h-3" />
             Element highlighted
           </span>
-        )}
-        {status === "not-found" && (
+        ) : status === "not-found" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-amber-400 shrink-0">
             <AlertCircleIcon className="w-3 h-3" />
             Element not found
           </span>
-        )}
+        ) : null}
 
         <button
           onClick={onClose}
@@ -254,15 +289,33 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
         </button>
       </div>
 
-      {/* Iframe */}
-      <iframe
-        ref={iframeRef}
-        src={proxyUrl}
-        className="flex-1 w-full border-0 bg-white"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        title="Live page preview"
-        onError={() => setStatus("error")}
-      />
+      {/* Loading skeleton */}
+      {!blobUrl && !fetchError && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-slate-950">
+          <Loader2 className="w-7 h-7 text-slate-600 animate-spin" />
+          <p className="text-sm text-slate-500">Fetching page through proxy…</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {fetchError && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-slate-950">
+          <AlertCircleIcon className="w-8 h-8 text-red-400" />
+          <p className="text-sm text-slate-400">Could not load the page preview.</p>
+          <p className="text-xs text-slate-600 max-w-sm text-center">{fetchError}</p>
+        </div>
+      )}
+
+      {/* Iframe — loaded from a same-origin Blob URL, never touches supabase.co directly */}
+      {blobUrl && (
+        <iframe
+          ref={iframeRef}
+          src={blobUrl}
+          className="flex-1 w-full border-0 bg-white"
+          sandbox="allow-scripts allow-same-origin allow-forms"
+          title="Live page preview"
+        />
+      )}
     </div>
   );
 }
