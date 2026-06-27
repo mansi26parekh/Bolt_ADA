@@ -669,19 +669,7 @@ function analyzeAccessibility(
     }
   }
 
-  // ── 13. Duplicate IDs (WAVE: duplicate_id) ──
-  const idCountRe = /\bid\s*=\s*["']([^"']+)["']/gi;
-  const idCounts: Record<string, number> = {};
-  while ((match = idCountRe.exec(cleanHtml)) !== null) {
-    idCounts[match[1]] = (idCounts[match[1]] || 0) + 1;
-  }
-  for (const [id, count] of Object.entries(idCounts)) {
-    if (count > 1) {
-      violations.push(v("duplicate-id", "serious", "WCAG 4.1.1",
-        `id="${id}" appears ${count} times. IDs must be unique; duplicate IDs break label associations, ARIA references, and anchor navigation.`,
-        "https://wave.webaim.org/api/references#e_duplicate_id", `id="${id}"`, `#${cssEscape(id)}`));
-    }
-  }
+
 
   // ── Structural pass bonuses ──
   if (/<main\b/i.test(cleanHtml) || /\brole\s*=\s*["']main["']/i.test(cleanHtml)) passCount++;
