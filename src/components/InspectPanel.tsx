@@ -174,19 +174,19 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 type PreviewStatus = "loading" | "ready" | "not-found" | "error";
 
 interface PreviewModalProps {
+  result: ScanResult;
   pageUrl: string;
-  selector: string | null | undefined;
   onClose: () => void;
 }
 
-function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
+function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [status, setStatus] = useState<PreviewStatus>("loading");
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Fetch the proxied HTML as text → Blob URL so the iframe never connects
-  // directly to the edge function domain (avoids sandbox iframe restrictions).
+  const selector = result.selector;
+
   useEffect(() => {
     let revoked = false;
     let currentBlob: string | null = null;
@@ -195,11 +195,7 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
       try {
         const res = await fetch(
           `${PROXY_BASE}?url=${encodeURIComponent(pageUrl)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` } }
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const html = await res.text();
@@ -213,7 +209,6 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
     };
 
     load();
-
     return () => {
       revoked = true;
       if (currentBlob) URL.revokeObjectURL(currentBlob);
@@ -222,10 +217,7 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
 
   const sendHighlight = useCallback(() => {
     if (!selector || !iframeRef.current?.contentWindow) return;
-    iframeRef.current.contentWindow.postMessage(
-      { type: "ada-highlight", selector },
-      "*"
-    );
+    iframeRef.current.contentWindow.postMessage({ type: "ada-highlight", selector }, "*");
   }, [selector]);
 
   useEffect(() => {
@@ -244,9 +236,12 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const config = impactConfig[result.impact as ImpactLevel] ?? impactConfig.moderate;
+  const fix = getFix(result.rule_id);
+
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-slate-950">
-      {/* Toolbar */}
+      {/* ── Top toolbar ── */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-slate-800 shrink-0 bg-slate-950">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${status === "ready" ? "bg-emerald-400" : "bg-red-500 animate-pulse"}`} />
@@ -260,8 +255,7 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
 
         {fetchError ? (
           <span className="flex items-center gap-1.5 text-[11px] text-red-400 shrink-0">
-            <AlertCircleIcon className="w-3 h-3" />
-            Failed to load page
+            <AlertCircleIcon className="w-3 h-3" />Failed to load page
           </span>
         ) : status === "loading" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-slate-400 shrink-0">
@@ -270,13 +264,11 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
           </span>
         ) : status === "ready" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-emerald-400 shrink-0">
-            <Check className="w-3 h-3" />
-            Element highlighted
+            <Check className="w-3 h-3" />Element highlighted
           </span>
         ) : status === "not-found" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-amber-400 shrink-0">
-            <AlertCircleIcon className="w-3 h-3" />
-            Element not found
+            <AlertCircleIcon className="w-3 h-3" />Element not found
           </span>
         ) : null}
 
@@ -289,33 +281,133 @@ function PreviewModal({ pageUrl, selector, onClose }: PreviewModalProps) {
         </button>
       </div>
 
-      {/* Loading skeleton */}
-      {!blobUrl && !fetchError && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-slate-950">
-          <Loader2 className="w-7 h-7 text-slate-600 animate-spin" />
-          <p className="text-sm text-slate-500">Fetching page through proxy…</p>
-        </div>
-      )}
+      {/* ── Split body ── */}
+      <div className="flex-1 flex overflow-hidden">
 
-      {/* Error state */}
-      {fetchError && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-slate-950">
-          <AlertCircleIcon className="w-8 h-8 text-red-400" />
-          <p className="text-sm text-slate-400">Could not load the page preview.</p>
-          <p className="text-xs text-slate-600 max-w-sm text-center">{fetchError}</p>
+        {/* Left: live page */}
+        <div className="flex-1 relative bg-white">
+          {!blobUrl && !fetchError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950">
+              <Loader2 className="w-7 h-7 text-slate-600 animate-spin" />
+              <p className="text-sm text-slate-500">Fetching page through proxy…</p>
+            </div>
+          )}
+          {fetchError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950">
+              <AlertCircleIcon className="w-8 h-8 text-red-400" />
+              <p className="text-sm text-slate-400">Could not load the page preview.</p>
+              <p className="text-xs text-slate-600 max-w-xs text-center">{fetchError}</p>
+            </div>
+          )}
+          {blobUrl && (
+            <iframe
+              ref={iframeRef}
+              src={blobUrl}
+              className="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+              title="Live page preview"
+            />
+          )}
         </div>
-      )}
 
-      {/* Iframe — loaded from a same-origin Blob URL, never touches supabase.co directly */}
-      {blobUrl && (
-        <iframe
-          ref={iframeRef}
-          src={blobUrl}
-          className="flex-1 w-full border-0 bg-white"
-          sandbox="allow-scripts allow-same-origin allow-forms"
-          title="Live page preview"
-        />
-      )}
+        {/* Right: details panel */}
+        <div className="w-[380px] shrink-0 border-l border-slate-800 flex flex-col bg-slate-950 overflow-hidden">
+          {/* Panel header */}
+          <div className="px-4 py-3 border-b border-slate-800 shrink-0">
+            <div className="flex items-start gap-2">
+              <config.icon className={`w-4 h-4 ${config.color} shrink-0 mt-0.5`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white leading-snug">{result.title}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.badge}`}>
+                    {config.label}
+                  </span>
+                  <span className="text-[10px] text-slate-500">{result.category}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable details */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+
+            {/* Description */}
+            <section>
+              <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />Issue
+              </h3>
+              <p className="text-[11px] text-slate-300 leading-relaxed">{result.description}</p>
+            </section>
+
+            {/* Affected HTML */}
+            {result.element && (
+              <section>
+                <div className="flex items-center justify-between mb-1.5">
+                  <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    <Code2 className="w-3 h-3" />Affected HTML
+                  </h3>
+                  <CopyButton text={result.element} label="HTML" />
+                </div>
+                <div className="relative">
+                  <pre className="text-[10px] text-red-300 bg-red-500/5 border border-red-500/20 px-2.5 py-2 rounded-lg overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">
+                    {result.element}
+                  </pre>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500/40 rounded-b-lg" />
+                </div>
+              </section>
+            )}
+
+            {/* CSS Selector */}
+            {selector && (
+              <section>
+                <div className="flex items-center justify-between mb-1.5">
+                  <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CSS Selector</h3>
+                  <CopyButton text={selector} label="Selector" />
+                </div>
+                <code className="text-[10px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 px-2.5 py-2 rounded-lg block font-mono break-all">
+                  {selector}
+                </code>
+              </section>
+            )}
+
+            {/* Recommended Fix */}
+            <section>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Lightbulb className="w-3 h-3 text-amber-400" />Recommended Fix
+                </h3>
+                <CopyButton text={fix.code} label="Fix code" />
+              </div>
+              <p className="text-[10px] text-slate-400 mb-1.5 leading-relaxed">{fix.summary}</p>
+              <pre className="text-[10px] text-emerald-300 bg-slate-900 border border-slate-700 px-2.5 py-2 rounded-lg overflow-x-auto whitespace-pre font-mono leading-relaxed">
+                {fix.code}
+              </pre>
+            </section>
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-2.5 border-t border-slate-800 shrink-0 flex items-center gap-3">
+            {result.help_url && (
+              <a
+                href={result.help_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                WCAG reference<ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+            <a
+              href={pageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors ml-auto"
+            >
+              Open page<ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -357,8 +449,8 @@ export function InspectPanel({ result, pageUrl, onClose }: InspectPanelProps) {
       {/* Live preview modal */}
       {showPreview && result && pageUrl && (
         <PreviewModal
+          result={result}
           pageUrl={pageUrl}
-          selector={result.selector}
           onClose={() => setShowPreview(false)}
         />
       )}
