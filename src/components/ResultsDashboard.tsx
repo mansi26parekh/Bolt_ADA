@@ -64,6 +64,25 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
     return filtered;
   }, [results, impactFilter, selectedPage]);
 
+  const groupedViolations = useMemo(() => {
+    const groups: Record<string, typeof filteredResults> = {};
+    for (const r of filteredResults) {
+      (groups[r.rule_id] ??= []).push(r);
+    }
+    const severityOrder: Record<string, number> = { critical: 0, serious: 1, moderate: 2, minor: 3 };
+    return Object.entries(groups).sort((a, b) => {
+      const aS = severityOrder[a[1][0].impact] ?? 4;
+      const bS = severityOrder[b[1][0].impact] ?? 4;
+      return aS !== bS ? aS - bS : b[1].length - a[1].length;
+    });
+  }, [filteredResults]);
+
+  const pageMap = useMemo(() => {
+    const m: Record<string, typeof pages[number]> = {};
+    for (const p of pages) m[p.id] = p;
+    return m;
+  }, [pages]);
+
   const toggleViolation = (id: string) => {
     setExpandedViolations((prev) => {
       const next = new Set(prev);
@@ -199,7 +218,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
               <tab.icon className="w-4 h-4" />
               {tab.label}
               {tab.id === "violations" && (
-                <span className="text-xs bg-slate-800 px-1.5 py-0.5 rounded-full">{results.length}</span>
+                <span className="text-xs bg-slate-800 px-1.5 py-0.5 rounded-full">{groupedViolations.length}</span>
               )}
             </button>
           ))}
@@ -425,34 +444,40 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
               </span>
             </div>
 
-            {/* Violation List */}
+            {/* Violation List — grouped by rule */}
             <div className="space-y-2">
-              {filteredResults.length === 0 && (
+              {groupedViolations.length === 0 && (
                 <div className="text-center py-12">
                   <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
                   <p className="text-sm text-slate-400">No violations match your filters</p>
                 </div>
               )}
-              {filteredResults.map((result) => {
-                const config = impactConfig[result.impact as ImpactLevel] ?? impactConfig.moderate;
-                const isExpanded = expandedViolations.has(result.id);
+              {groupedViolations.map(([ruleId, group]) => {
+                const config = impactConfig[group[0].impact as ImpactLevel] ?? impactConfig.moderate;
+                const isExpanded = expandedViolations.has(ruleId);
+                // Group instances by page
+                const byPage: Record<string, typeof group> = {};
+                for (const r of group) (byPage[r.page_id] ??= []).push(r);
                 return (
                   <div
-                    key={result.id}
-                    className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden"
+                    key={ruleId}
+                    className={`bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden ${config.border}`}
                   >
                     <button
-                      onClick={() => toggleViolation(result.id)}
+                      onClick={() => toggleViolation(ruleId)}
                       className="w-full p-4 flex items-start gap-3 text-left hover:bg-slate-800/30 transition-colors"
                     >
                       <config.icon className={`w-4 h-4 ${config.color} shrink-0 mt-0.5`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-200">{result.title}</p>
+                        <p className="text-sm font-medium text-slate-200">{group[0].title}</p>
                         <div className="flex items-center gap-2 mt-1.5">
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.badge}`}>
                             {config.label}
                           </span>
-                          <span className="text-[10px] text-slate-600">{result.category}</span>
+                          <span className="text-[10px] text-slate-600">{group[0].category}</span>
+                          <span className="text-[10px] text-slate-500">
+                            {group.length} instance{group.length !== 1 ? "s" : ""} across {Object.keys(byPage).length} page{Object.keys(byPage).length !== 1 ? "s" : ""}
+                          </span>
                         </div>
                       </div>
                       {isExpanded ? (
@@ -462,37 +487,47 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                       )}
                     </button>
                     {isExpanded && (
-                      <div className="px-4 pb-4 pl-11 space-y-3">
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Description</p>
-                          <p className="text-xs text-slate-300">{result.description}</p>
-                        </div>
-                        {result.element && (
-                          <div>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Element</p>
-                            <code className="text-xs text-slate-300 bg-slate-800/50 px-3 py-1.5 rounded-lg block break-all">
-                              {result.element}
-                            </code>
+                      <div className="border-t border-slate-800/50 divide-y divide-slate-800/40">
+                        {Object.entries(byPage).map(([pageId, pageResults]) => {
+                          const pg = pageMap[pageId];
+                          return (
+                            <div key={pageId} className="bg-slate-800/20">
+                              <p className="text-[10px] text-slate-500 font-medium px-4 pt-2.5 pb-1 truncate">
+                                {pg?.title || pg?.url || pageId}
+                              </p>
+                              <div className="space-y-2 px-4 pb-3">
+                                {pageResults.map((result, idx) => (
+                                  <div key={result.id} className="space-y-1.5 pl-3 border-l border-slate-700/50">
+                                    {pageResults.length > 1 && (
+                                      <p className="text-[10px] text-slate-600 font-medium">Instance {idx + 1}</p>
+                                    )}
+                                    <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
+                                    {result.element && (
+                                      <code className="text-[10px] text-slate-400 bg-slate-800/60 px-2 py-1 rounded block break-all font-mono">
+                                        {result.element}
+                                      </code>
+                                    )}
+                                    {result.selector && (
+                                      <p className="text-[10px] text-slate-500 font-mono">{result.selector}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {group[0].help_url && (
+                          <div className="px-4 py-2.5 bg-slate-900/40">
+                            <a
+                              href={group[0].help_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                            >
+                              Learn how to fix this
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
                           </div>
-                        )}
-                        {result.selector && (
-                          <div>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Selector</p>
-                            <code className="text-xs text-emerald-400/80 bg-slate-800/50 px-3 py-1.5 rounded-lg block">
-                              {result.selector}
-                            </code>
-                          </div>
-                        )}
-                        {result.help_url && (
-                          <a
-                            href={result.help_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-                          >
-                            Learn how to fix this
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
                         )}
                       </div>
                     )}
