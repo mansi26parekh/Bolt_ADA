@@ -14,8 +14,10 @@ import {
   FileText,
   CheckCircle2,
   XCircle,
+  ScanSearch,
 } from "lucide-react";
-import type { ScanData } from "../lib/types";
+import type { ScanData, ScanResult } from "../lib/types";
+import { InspectPanel } from "./InspectPanel";
 
 interface ResultsDashboardProps {
   scanData: ScanData;
@@ -38,6 +40,9 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
   const [expandedViolations, setExpandedViolations] = useState<Set<string>>(new Set());
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [inspectResult, setInspectResult] = useState<ScanResult | null>(null);
+  const [inspectPageUrl, setInspectPageUrl] = useState<string | null>(null);
+  const [hoverInspect, setHoverInspect] = useState<string | null>(null);
 
   const { scan, pages, results } = scanData;
 
@@ -96,7 +101,18 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
     return "Critical";
   };
 
+  const openInspect = (result: ScanResult, pageUrl: string) => {
+    setInspectResult(result);
+    setInspectPageUrl(pageUrl);
+  };
+
   return (
+    <>
+      <InspectPanel
+        result={inspectResult}
+        pageUrl={inspectPageUrl}
+        onClose={() => { setInspectResult(null); setInspectPageUrl(null); }}
+      />
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Top Bar */}
       <header className="border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-sm sticky top-0 z-10">
@@ -272,47 +288,61 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                   key={page.id}
                   className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden"
                 >
-                  <button
-                    onClick={() => setExpandedPage((prev) => (prev === page.id ? null : page.id))}
-                    className="w-full p-4 flex items-start gap-3 text-left hover:bg-slate-800/30 transition-colors"
-                  >
-                    {page.status === "completed" ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-200 truncate">
-                        {page.title || "Untitled Page"}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">{page.url}</p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className={`text-xs font-mono font-medium px-2 py-0.5 rounded-md ${scoreBg(page.score)} ${scoreColor(page.score)}`}>
-                          Score: {page.score ?? "N/A"}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          Depth: {page.depth}
-                        </span>
-                        <span className="text-xs text-red-400/80">
-                          {page.violation_count} violations
-                        </span>
-                        {page.violation_count === 0 ? (
-                          <span className="text-xs text-emerald-400/80">
-                            All checks passed
+                  <div className="flex items-start gap-3 p-4">
+                    <button
+                      onClick={() => setExpandedPage((prev) => (prev === page.id ? null : page.id))}
+                      className="flex items-start gap-3 flex-1 min-w-0 text-left"
+                    >
+                      {page.status === "completed" ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-200 truncate">
+                          {page.title || "Untitled Page"}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">{page.url}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className={`text-xs font-mono font-medium px-2 py-0.5 rounded-md ${scoreBg(page.score)} ${scoreColor(page.score)}`}>
+                            Score: {page.score ?? "N/A"}
                           </span>
-                        ) : page.pass_count > 0 && (
-                          <span className="text-xs text-emerald-400/80">
-                            {page.pass_count} passes
-                          </span>
-                        )}
+                          <span className="text-xs text-slate-500">Depth: {page.depth}</span>
+                          <span className="text-xs text-red-400/80">{page.violation_count} violations</span>
+                          {page.violation_count === 0 ? (
+                            <span className="text-xs text-emerald-400/80">All checks passed</span>
+                          ) : page.pass_count > 0 && (
+                            <span className="text-xs text-emerald-400/80">{page.pass_count} passes</span>
+                          )}
+                        </div>
                       </div>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                      {page.violation_count > 0 && (
+                        <a
+                          href={page.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-violet-500/10 text-violet-300 border border-violet-500/30 hover:bg-violet-500/20 transition-colors"
+                          title="Open page"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Open
+                        </a>
+                      )}
+                      <button
+                        onClick={() => setExpandedPage((prev) => (prev === page.id ? null : page.id))}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
                     </div>
-                    {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-slate-600 shrink-0 mt-1" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-600 shrink-0 mt-1" />
-                    )}
-                  </button>
+                  </div>
                   {isExpanded && pageViolations.length > 0 && (
                     <div className="border-t border-slate-800/50 bg-slate-800/30 p-3 space-y-1.5">
                       {/* Group by rule_id, WAVE-style */}
@@ -352,8 +382,29 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                             {groupExpanded && (
                               <div className="divide-y divide-slate-800/50">
                                 {group.map((result, idx) => (
-                                  <div key={result.id} className="px-3 py-2 pl-9 bg-slate-900/70 space-y-1.5">
-                                    <p className="text-[10px] text-slate-500 font-medium">Instance {idx + 1}</p>
+                                  <div
+                                    key={result.id}
+                                    className={`px-3 py-2 pl-9 bg-slate-900/70 space-y-1.5 transition-colors ${
+                                      hoverInspect === result.id ? "bg-red-500/5" : ""
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-[10px] text-slate-500 font-medium">Instance {idx + 1}</p>
+                                      <button
+                                        onClick={() => openInspect(result, page.url)}
+                                        onMouseEnter={() => setHoverInspect(result.id)}
+                                        onMouseLeave={() => setHoverInspect(null)}
+                                        className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md transition-colors ${
+                                          hoverInspect === result.id
+                                            ? "bg-red-500/20 text-red-300 border border-red-500/40"
+                                            : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30"
+                                        }`}
+                                        title="Inspect this element"
+                                      >
+                                        <ScanSearch className="w-3 h-3" />
+                                        Inspect
+                                      </button>
+                                    </div>
                                     <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
                                     {result.element && (
                                       <code className="text-[10px] text-slate-400 bg-slate-800/60 px-2 py-1 rounded block break-all font-mono">
@@ -504,5 +555,6 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
         )}
       </div>
     </div>
+    </>
   );
 }
