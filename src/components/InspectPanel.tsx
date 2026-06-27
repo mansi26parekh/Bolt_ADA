@@ -179,7 +179,7 @@ interface PreviewModalProps {
   onClose: () => void;
 }
 
-function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
+export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [status, setStatus] = useState<PreviewStatus>("loading");
   const [blobUrl, setBlobUrl] = useState<string | null>(null);

@@ -17,7 +17,7 @@ import {
   ScanSearch,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
-import { InspectPanel } from "./InspectPanel";
+import { PreviewModal } from "./InspectPanel";
 
 interface ResultsDashboardProps {
   scanData: ScanData;
@@ -106,13 +106,13 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
     setInspectPageUrl(pageUrl);
   };
 
+  const closeInspect = () => { setInspectResult(null); setInspectPageUrl(null); };
+
   return (
     <>
-      <InspectPanel
-        result={inspectResult}
-        pageUrl={inspectPageUrl}
-        onClose={() => { setInspectResult(null); setInspectPageUrl(null); }}
-      />
+      {inspectResult && inspectPageUrl && (
+        <PreviewModal result={inspectResult} pageUrl={inspectPageUrl} onClose={closeInspect} />
+      )}
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Top Bar */}
       <header className="border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-sm sticky top-0 z-10">
