@@ -47,13 +47,13 @@ function App() {
     async (url: string, maxDepth: number) => {
       try {
         const { project, alreadyExisted } = await ensureProject(url);
+        const isDifferentProject = project.id !== activeProjectId;
         setActiveProjectId(project.id);
 
-        if (alreadyExisted) {
+        if (alreadyExisted && isDifferentProject) {
           setToastMessage("Project already exists. Opening existing project.");
-          // Refresh projects list to get latest state
           getAllProjects().then(setProjects).catch(() => {});
-        } else {
+        } else if (!alreadyExisted) {
           setProjects((prev) =>
             [...prev, project].sort((a, b) => a.name.localeCompare(b.name))
           );
@@ -64,7 +64,7 @@ function App() {
 
       startScan(url, maxDepth);
     },
-    [startScan]
+    [startScan, activeProjectId]
   );
 
   const handleSelectProject = useCallback(
