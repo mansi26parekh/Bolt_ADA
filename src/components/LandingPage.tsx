@@ -4,10 +4,11 @@ import { Shield, Globe, Layers, ArrowRight, CheckCircle2, Search, Zap, BarChart3
 interface LandingPageProps {
   onStartScan: (url: string, maxDepth: number) => void;
   error: string | null;
+  initialUrl?: string;
 }
 
-export function LandingPage({ onStartScan, error }: LandingPageProps) {
-  const [url, setUrl] = useState("");
+export function LandingPage({ onStartScan, error, initialUrl = "" }: LandingPageProps) {
+  const [url, setUrl] = useState(initialUrl);
   const [maxDepth, setMaxDepth] = useState(3);
   const [isExpanded, setIsExpanded] = useState(false);
 

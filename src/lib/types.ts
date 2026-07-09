@@ -48,3 +48,12 @@ export interface ScanData {
 }
 
 export type View = "landing" | "scanning" | "results";
+
+export interface Project {
+  id: string;
+  name: string;
+  domain: string;
+  url: string;
+  last_scan_id: string | null;
+  created_at: string;
+}
