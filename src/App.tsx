@@ -5,10 +5,12 @@ import { ScanningView } from "./components/ScanningView";
 import { ResultsDashboard } from "./components/ResultsDashboard";
 import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import {
   ensureProject,
   getAllProjects,
   updateLastScan,
+  deleteProject,
 } from "./lib/projectService";
 import type { Project } from "./lib/types";
 
@@ -19,6 +21,7 @@ function App() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [landingInitialUrl, setLandingInitialUrl] = useState<string>("");
+  const [pendingDeleteProject, setPendingDeleteProject] = useState<Project | null>(null);
 
   // Load projects on mount
   useEffect(() => {
@@ -85,12 +88,34 @@ function App() {
     resetScan();
   }, [resetScan]);
 
+  const handleDeleteProject = useCallback((project: Project) => {
+    setPendingDeleteProject(project);
+  }, []);
+
+  const confirmDeleteProject = useCallback(async () => {
+    if (!pendingDeleteProject) return;
+    const id = pendingDeleteProject.id;
+    setPendingDeleteProject(null);
+    try {
+      await deleteProject(id);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      if (activeProjectId === id) {
+        setActiveProjectId(null);
+        setLandingInitialUrl("");
+        resetScan();
+      }
+    } catch {
+      // deletion failed silently
+    }
+  }, [pendingDeleteProject, activeProjectId, resetScan]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
       <Sidebar
         projects={projects}
         activeProjectId={activeProjectId}
         onSelectProject={handleSelectProject}
+        onDeleteProject={handleDeleteProject}
         onNewScan={handleNewScan}
       />
 
@@ -110,6 +135,16 @@ function App() {
 
       {toastMessage && (
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      )}
+
+      {pendingDeleteProject && (
+        <ConfirmDialog
+          title={`Delete "${pendingDeleteProject.name}"?`}
+          message="This project will be permanently removed. Any scans already run are not affected."
+          confirmLabel="Delete Project"
+          onConfirm={confirmDeleteProject}
+          onCancel={() => setPendingDeleteProject(null)}
+        />
       )}
     </div>
   );

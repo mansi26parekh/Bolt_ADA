@@ -63,6 +63,14 @@ export async function getAllProjects(): Promise<Project[]> {
   return (data ?? []) as Project[];
 }
 
+export async function deleteProject(projectId: string): Promise<void> {
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", projectId);
+  if (error) throw error;
+}
+
 export async function updateLastScan(projectId: string, scanId: string): Promise<void> {
   await supabase
     .from("projects")

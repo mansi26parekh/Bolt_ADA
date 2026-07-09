@@ -1,14 +1,15 @@
-import { Shield, FolderOpen, Folder, Plus } from "lucide-react";
+import { Shield, FolderOpen, Folder, Plus, X } from "lucide-react";
 import type { Project } from "../lib/types";
 
 interface SidebarProps {
   projects: Project[];
   activeProjectId: string | null;
   onSelectProject: (project: Project) => void;
+  onDeleteProject: (project: Project) => void;
   onNewScan: () => void;
 }
 
-export function Sidebar({ projects, activeProjectId, onSelectProject, onNewScan }: SidebarProps) {
+export function Sidebar({ projects, activeProjectId, onSelectProject, onDeleteProject, onNewScan }: SidebarProps) {
   return (
     <aside className="w-52 shrink-0 flex flex-col bg-slate-950 border-r border-slate-800/60 h-screen sticky top-0 overflow-hidden">
       {/* Logo */}
@@ -46,21 +47,39 @@ export function Sidebar({ projects, activeProjectId, onSelectProject, onNewScan 
               const isActive = project.id === activeProjectId;
               return (
                 <li key={project.id}>
-                  <button
-                    onClick={() => onSelectProject(project)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all group ${
+                  <div
+                    className={`group flex items-center rounded-lg transition-all ${
                       isActive
-                        ? "bg-emerald-500/15 border border-emerald-500/25 text-emerald-300"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent"
+                        ? "bg-emerald-500/15 border border-emerald-500/25"
+                        : "border border-transparent hover:bg-slate-800/60"
                     }`}
                   >
-                    {isActive ? (
-                      <FolderOpen className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                    ) : (
-                      <Folder className="w-3.5 h-3.5 shrink-0 text-slate-500 group-hover:text-slate-300" />
-                    )}
-                    <span className="text-xs font-medium truncate capitalize">{project.name}</span>
-                  </button>
+                    <button
+                      onClick={() => onSelectProject(project)}
+                      className={`flex-1 flex items-center gap-2 px-2.5 py-2 text-left min-w-0 ${
+                        isActive ? "text-emerald-300" : "text-slate-400 group-hover:text-white"
+                      }`}
+                    >
+                      {isActive ? (
+                        <FolderOpen className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                      ) : (
+                        <Folder className="w-3.5 h-3.5 shrink-0 text-slate-500 group-hover:text-slate-300" />
+                      )}
+                      <span className="text-xs font-medium truncate capitalize">{project.name}</span>
+                    </button>
+
+                    {/* Delete button — visible on hover */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteProject(project);
+                      }}
+                      className="shrink-0 p-1.5 mr-1 rounded-md opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                      title="Delete project"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </li>
               );
             })}
