@@ -47,15 +47,6 @@ export interface ScanData {
   results: ScanResult[];
 }
 
-export interface ScanSummary {
-  id: string;
-  score: number | null;
-  status: "pending" | "running" | "completed" | "failed";
-  total_violations: number;
-  pages_scanned: number;
-  created_at: string;
-}
-
 export type View = "landing" | "scanning" | "results";
 
 export interface Project {

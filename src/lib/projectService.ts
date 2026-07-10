@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Project, ScanSummary } from "./types";
+import type { Project } from "./types";
 
 const COMPOUND_TLDS = new Set([
   "co.uk", "com.au", "co.nz", "co.in", "com.br", "co.jp", "org.uk",
@@ -76,17 +76,4 @@ export async function updateLastScan(projectId: string, scanId: string): Promise
     .from("projects")
     .update({ last_scan_id: scanId })
     .eq("id", projectId);
-}
-
-export async function getScansByDomain(domain: string): Promise<ScanSummary[]> {
-  const { data, error } = await supabase
-    .from("scans")
-    .select("id, score, status, total_violations, pages_scanned, created_at")
-    .or(`url.ilike.%://${domain}.%,url.ilike.%://www.${domain}.%`)
-    .in("status", ["completed", "failed"])
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (error) throw error;
-  return (data ?? []) as ScanSummary[];
 }

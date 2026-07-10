@@ -1,39 +1,15 @@
-import { Shield, FolderOpen, Folder, Plus, X, FileBarChart } from "lucide-react";
-import type { Project, ScanSummary } from "../lib/types";
+import { Shield, FolderOpen, Folder, Plus, X } from "lucide-react";
+import type { Project } from "../lib/types";
 
 interface SidebarProps {
   projects: Project[];
   activeProjectId: string | null;
-  projectScans: ScanSummary[];
-  currentScanId: string | null;
   onSelectProject: (project: Project) => void;
   onDeleteProject: (project: Project) => void;
-  onSelectScan: (scanId: string) => void;
   onNewScan: () => void;
 }
 
-function formatScanDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function scoreColor(score: number | null): string {
-  if (score === null) return "text-slate-500";
-  if (score >= 80) return "text-emerald-400";
-  if (score >= 50) return "text-amber-400";
-  return "text-red-400";
-}
-
-export function Sidebar({
-  projects,
-  activeProjectId,
-  projectScans,
-  currentScanId,
-  onSelectProject,
-  onDeleteProject,
-  onSelectScan,
-  onNewScan,
-}: SidebarProps) {
+export function Sidebar({ projects, activeProjectId, onSelectProject, onDeleteProject, onNewScan }: SidebarProps) {
   return (
     <aside className="w-52 shrink-0 flex flex-col bg-slate-950 border-r border-slate-800/60 h-screen sticky top-0 overflow-hidden">
       {/* Logo */}
@@ -69,11 +45,8 @@ export function Sidebar({
           <ul className="space-y-0.5">
             {projects.map((project) => {
               const isActive = project.id === activeProjectId;
-              const showScans = isActive && projectScans.length > 0;
-
               return (
                 <li key={project.id}>
-                  {/* Project row */}
                   <div
                     className={`group flex items-center rounded-lg transition-all ${
                       isActive
@@ -103,37 +76,6 @@ export function Sidebar({
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-
-                  {/* Scan history tree — only for active project */}
-                  {showScans && (
-                    <ul className="ml-3 mt-0.5 mb-1 pl-3 border-l border-slate-800 space-y-0.5">
-                      {projectScans.map((scan) => {
-                        const isCurrent = scan.id === currentScanId;
-                        return (
-                          <li key={scan.id}>
-                            <button
-                              onClick={() => onSelectScan(scan.id)}
-                              className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left transition-all ${
-                                isCurrent
-                                  ? "bg-slate-700/50 text-white"
-                                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
-                              }`}
-                            >
-                              <FileBarChart className={`w-3 h-3 shrink-0 ${isCurrent ? "text-emerald-400" : "text-slate-600"}`} />
-                              <span className="text-[11px] flex-1 truncate leading-none">
-                                {formatScanDate(scan.created_at)}
-                              </span>
-                              {scan.score !== null && (
-                                <span className={`text-[10px] font-bold tabular-nums ${scoreColor(scan.score)}`}>
-                                  {scan.score}
-                                </span>
-                              )}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
                 </li>
               );
             })}

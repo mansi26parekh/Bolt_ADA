@@ -11,16 +11,14 @@ import {
   getAllProjects,
   updateLastScan,
   deleteProject,
-  getScansByDomain,
 } from "./lib/projectService";
-import type { Project, ScanSummary } from "./lib/types";
+import type { Project } from "./lib/types";
 
 function App() {
   const { view, scanData, scanId, error, startScan, goToResults, resetScan } = useScan();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [projectScans, setProjectScans] = useState<ScanSummary[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [landingInitialUrl, setLandingInitialUrl] = useState<string>("");
   const [pendingDeleteProject, setPendingDeleteProject] = useState<Project | null>(null);
@@ -31,20 +29,6 @@ function App() {
       .then(setProjects)
       .catch(() => {});
   }, []);
-
-  // Fetch scan history whenever active project changes or view becomes results
-  useEffect(() => {
-    if (!activeProjectId) {
-      setProjectScans([]);
-      return;
-    }
-    const activeProject = projects.find((p) => p.id === activeProjectId);
-    if (!activeProject) return;
-
-    getScansByDomain(activeProject.domain)
-      .then(setProjectScans)
-      .catch(() => {});
-  }, [activeProjectId, view, projects]);
 
   // When a scan starts (scanId appears), record it on the active project
   useEffect(() => {
@@ -116,7 +100,6 @@ function App() {
       setProjects((prev) => prev.filter((p) => p.id !== id));
       if (activeProjectId === id) {
         setActiveProjectId(null);
-        setProjectScans([]);
         setLandingInitialUrl("");
         resetScan();
       }
@@ -125,18 +108,19 @@ function App() {
     }
   }, [pendingDeleteProject, activeProjectId, resetScan]);
 
+  const showSidebar = view !== "landing";
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
-      <Sidebar
-        projects={projects}
-        activeProjectId={activeProjectId}
-        projectScans={projectScans}
-        currentScanId={scanId}
-        onSelectProject={handleSelectProject}
-        onDeleteProject={handleDeleteProject}
-        onSelectScan={goToResults}
-        onNewScan={handleNewScan}
-      />
+      {showSidebar && (
+        <Sidebar
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelectProject={handleSelectProject}
+          onDeleteProject={handleDeleteProject}
+          onNewScan={handleNewScan}
+        />
+      )}
 
       <div className="flex-1 overflow-auto">
         {view === "scanning" && scanId ? (
