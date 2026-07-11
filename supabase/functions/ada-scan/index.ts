@@ -45,11 +45,23 @@ Deno.serve(async (req: Request) => {
 
       const { data: pages } = await supabase
         .from("scan_pages").select("*").eq("scan_id", scanId).order("created_at", { ascending: true });
-      const { data: results } = await supabase
-        .from("scan_results").select("*").eq("scan_id", scanId).order("created_at", { ascending: true });
+
+      // Paginate results — Supabase caps each query at 1000 rows
+      let allResults: Record<string, unknown>[] = [];
+      let offset = 0;
+      while (true) {
+        const { data: batch } = await supabase
+          .from("scan_results").select("*").eq("scan_id", scanId)
+          .order("created_at", { ascending: true })
+          .range(offset, offset + 999);
+        if (!batch || batch.length === 0) break;
+        allResults = allResults.concat(batch as Record<string, unknown>[]);
+        if (batch.length < 1000) break;
+        offset += 1000;
+      }
 
       return new Response(
-        JSON.stringify({ scan, pages: pages || [], results: results || [] }),
+        JSON.stringify({ scan, pages: pages || [], results: allResults }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
