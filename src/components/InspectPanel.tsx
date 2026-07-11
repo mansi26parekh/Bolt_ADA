@@ -217,8 +217,13 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
 
   const sendHighlight = useCallback(() => {
     if (!selector || !iframeRef.current?.contentWindow) return;
-    iframeRef.current.contentWindow.postMessage({ type: "ada-highlight", selector }, "*");
-  }, [selector]);
+    iframeRef.current.contentWindow.postMessage({
+      type: "ada-highlight",
+      selector,
+      elementHtml: result.element,
+      ruleId: result.rule_id,
+    }, "*");
+  }, [selector, result]);
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {

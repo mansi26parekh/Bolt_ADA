@@ -21,13 +21,49 @@ const HIGHLIGHT_SCRIPT = `<script>
     if (lbl) lbl.remove();
   }
 
-  function highlight(selector) {
-    clearHighlight();
-    var el = document.querySelector(selector);
-    if (!el) {
-      window.parent.postMessage({ type: 'ada-not-found', selector: selector }, '*');
-      return;
+  function normalizeHtml(s) {
+    return s.replace(/\\s+/g, ' ').replace(/\\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function findExactElement(selector, elementHtml) {
+    // Strategy 1: Use CSS selector and disambiguate by elementHtml
+    try {
+      var matches = document.querySelectorAll(selector);
+      if (matches.length === 1) return matches[0];
+      if (matches.length > 1 && elementHtml) {
+        var normStored = normalizeHtml(elementHtml);
+        for (var i = 0; i < matches.length; i++) {
+          var candidate = matches[i];
+          var normCandidate = normalizeHtml(candidate.outerHTML);
+          if (normCandidate === normStored) return candidate;
+          if (normCandidate.indexOf(normStored) === 0 || normStored.indexOf(normCandidate) === 0) return candidate;
+        }
+        // If still ambiguous, try matching by key attributes from stored HTML
+        var tagMatch = elementHtml.match(/^<(\\w+)/);
+        var tagName = tagMatch ? tagMatch[1].toLowerCase() : null;
+        if (tagName) {
+          for (var j = 0; j < matches.length; j++) {
+            if (matches[j].tagName.toLowerCase() === tagName) return matches[j];
+          }
+        }
+      }
+      if (matches.length === 1) return matches[0];
+    } catch (e) { /* invalid selector, fall through */ }
+
+    // Strategy 2: Scan all elements and match by outerHTML
+    if (elementHtml) {
+      var normStored = normalizeHtml(elementHtml);
+      var allEls = document.querySelectorAll('*');
+      for (var k = 0; k < allEls.length; k++) {
+        var normEl = normalizeHtml(allEls[k].outerHTML);
+        if (normEl === normStored) return allEls[k];
+        if (normEl.indexOf(normStored) === 0 || normStored.indexOf(normEl) === 0) return allEls[k];
+      }
     }
+    return null;
+  }
+
+  function applyHighlight(el) {
     _highlighted = el;
     el.style.outline = '3px solid #ef4444';
     el.style.outlineOffset = '3px';
@@ -46,13 +82,40 @@ const HIGHLIGHT_SCRIPT = `<script>
       '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' +
       '</svg>ADA Inspector';
     document.body.appendChild(badge);
+  }
 
-    window.parent.postMessage({ type: 'ada-found', selector: selector }, '*');
+  function highlight(selector, elementHtml, ruleId) {
+    clearHighlight();
+
+    // For skip-link-broken: only highlight the skip link itself, not an unrelated element
+    if (ruleId === 'skip-link-broken') {
+      try {
+        var el = document.querySelector(selector);
+        if (el) {
+          applyHighlight(el);
+          window.parent.postMessage({ type: 'ada-found', selector: selector }, '*');
+        } else {
+          window.parent.postMessage({ type: 'ada-not-found', selector: selector }, '*');
+        }
+        return;
+      } catch (e) {
+        window.parent.postMessage({ type: 'ada-not-found', selector: selector }, '*');
+        return;
+      }
+    }
+
+    var found = findExactElement(selector, elementHtml);
+    if (found) {
+      applyHighlight(found);
+      window.parent.postMessage({ type: 'ada-found', selector: selector }, '*');
+    } else {
+      window.parent.postMessage({ type: 'ada-not-found', selector: selector }, '*');
+    }
   }
 
   window.addEventListener('message', function (e) {
     if (!e.data) return;
-    if (e.data.type === 'ada-highlight') highlight(e.data.selector);
+    if (e.data.type === 'ada-highlight') highlight(e.data.selector, e.data.elementHtml, e.data.ruleId);
     if (e.data.type === 'ada-clear') clearHighlight();
   });
 

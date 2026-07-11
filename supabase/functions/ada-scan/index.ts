@@ -454,7 +454,7 @@ function analyzeAccessibility(
     if (!/\balt\s*=/i.test(tag)) {
       violations.push(v("image-alt", "serious", "WCAG 1.1.1",
         "Image is missing an alt attribute. Screen readers cannot convey the image's content or purpose to non-sighted users.",
-        "https://wave.webaim.org/api/references#e_alt_missing", truncate(tag, 200), buildSelector(tag)));
+        "https://wave.webaim.org/api/references#e_alt_missing", truncate(tag, 2000), buildSelector(tag)));
     } else if (/\balt\s*=\s*["'][^"']+["']/i.test(tag)) {
       passCount++;
     }
@@ -480,7 +480,7 @@ function analyzeAccessibility(
     if (/<img\b/i.test(inner) && !hasImgAlt && !hasAL && !hasALB && !hasT && text.length === 0) {
       violations.push(v("image-alt-empty-link", "serious", "WCAG 1.1.1",
         "A linked image has an empty or missing alt attribute and the link has no other accessible text. Screen readers cannot determine the link's purpose.",
-        "https://wave.webaim.org/api/references#e_alt_link_missing", truncate(fullTag, 200), buildSelector(fullTag)));
+        "https://wave.webaim.org/api/references#e_alt_link_missing", truncate(fullTag, 2000), buildSelector(fullTag)));
     }
 
     // Empty link (WAVE: link_empty)
@@ -489,7 +489,7 @@ function analyzeAccessibility(
       if (!accessible) {
         violations.push(v("link-name", "serious", "WCAG 4.1.2",
           "Link has no accessible text. Screen readers cannot convey this link's purpose to the user.",
-          "https://wave.webaim.org/api/references#e_link_empty", truncate(fullTag, 200), buildSelector(fullTag)));
+          "https://wave.webaim.org/api/references#e_link_empty", truncate(fullTag, 2000), buildSelector(fullTag)));
       } else {
         passCount++;
       }
@@ -527,7 +527,7 @@ function analyzeAccessibility(
       if (!/\balt\s*=\s*["'][^"']*["']/i.test(tag)) {
         violations.push(v("input-image-alt", "serious", "WCAG 1.1.1",
           "Image input button is missing an alt attribute. Screen readers cannot identify this button's purpose.",
-          "https://wave.webaim.org/api/references#e_alt_input_missing", truncate(tag, 200), buildSelector(tag)));
+          "https://wave.webaim.org/api/references#e_alt_input_missing", truncate(tag, 2000), buildSelector(tag)));
       }
       continue;
     }
@@ -537,7 +537,7 @@ function analyzeAccessibility(
     } else {
       violations.push(v("label", "serious", "WCAG 1.3.1",
         "Form input does not have an associated label. Users relying on screen readers or voice control cannot determine what information to enter.",
-        "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 200), buildSelector(tag)));
+        "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 2000), buildSelector(tag)));
     }
   }
 
@@ -548,7 +548,7 @@ function analyzeAccessibility(
     if (!controlHasLabel(tag, match.index)) {
       violations.push(v("label", "serious", "WCAG 1.3.1",
         "Select (dropdown) element does not have an associated label. Screen reader users cannot identify the purpose of this control.",
-        "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 200), buildSelector(tag)));
+        "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 2000), buildSelector(tag)));
     }
   }
 
@@ -559,7 +559,7 @@ function analyzeAccessibility(
     if (!controlHasLabel(tag, match.index)) {
       violations.push(v("label", "serious", "WCAG 1.3.1",
         "Textarea element does not have an associated label.",
-        "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 200), buildSelector(tag)));
+        "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 2000), buildSelector(tag)));
     }
   }
 
@@ -571,7 +571,7 @@ function analyzeAccessibility(
     if (text.length === 0 && !/<img[^>]+\balt\s*=\s*["'][^"']+["']/i.test(inner)) {
       violations.push(v("label-empty", "serious", "WCAG 1.3.1",
         "A <label> element exists but is empty. An empty label provides no information to screen reader users about the associated form control.",
-        "https://wave.webaim.org/api/references#e_label_empty", truncate(match[0], 200), "label"));
+        "https://wave.webaim.org/api/references#e_label_empty", truncate(match[0], 2000), "label"));
     }
   }
 
@@ -602,7 +602,7 @@ function analyzeAccessibility(
     if (!accessible) {
       violations.push(v("button-name", "critical", "WCAG 4.1.2",
         "Button has no accessible text. Screen readers will announce it as an unnamed button, making it impossible for users to understand its purpose.",
-        "https://wave.webaim.org/api/references#e_button_empty", truncate(fullTag, 200), buildSelector(fullTag)));
+        "https://wave.webaim.org/api/references#e_button_empty", truncate(fullTag, 2000), buildSelector(fullTag)));
     } else {
       passCount++;
     }
@@ -618,7 +618,7 @@ function analyzeAccessibility(
         text.length === 0) {
       violations.push(v("empty-heading", "serious", "WCAG 1.3.1",
         `Heading level ${match[1]} (<h${match[1]}>) is empty. Empty headings disrupt screen reader navigation by creating dead landmarks.`,
-        "https://wave.webaim.org/api/references#e_heading_empty", truncate(match[0], 200), buildSelector(match[0])));
+        "https://wave.webaim.org/api/references#e_heading_empty", truncate(match[0], 2000), buildSelector(match[0])));
     }
   }
 
@@ -632,7 +632,7 @@ function analyzeAccessibility(
         !/\babbr\s*=\s*["'][^"']+["']/i.test(openTag)) {
       violations.push(v("th-empty", "serious", "WCAG 1.3.1",
         "Table header cell (<th>) is empty. Empty headers provide no column or row information to screen reader users.",
-        "https://wave.webaim.org/api/references#e_th_empty", truncate(match[0], 200), buildSelector(match[0])));
+        "https://wave.webaim.org/api/references#e_th_empty", truncate(match[0], 2000), buildSelector(match[0])));
     }
   }
 
@@ -647,7 +647,7 @@ function analyzeAccessibility(
           if (refId && !allIds.has(refId)) {
             violations.push(v("aria-reference-broken", "critical", "WCAG 4.1.2",
               `${attr}="${am[1]}" references id="${refId}" which does not exist on this page. Broken ARIA references cause screen readers to fail silently.`,
-              "https://wave.webaim.org/api/references#e_aria_reference_broken", truncate(tag, 200), buildSelector(tag)));
+              "https://wave.webaim.org/api/references#e_aria_reference_broken", truncate(tag, 2000), buildSelector(tag)));
             break;
           }
         }
@@ -665,7 +665,7 @@ function analyzeAccessibility(
     if (isSkipLink && !allIds.has(targetId)) {
       violations.push(v("skip-link-broken", "serious", "WCAG 2.4.1",
         `Skip link points to "#${targetId}" which does not exist on this page. Users who rely on skip links to bypass navigation are stranded.`,
-        "https://wave.webaim.org/api/references#e_skip_target_missing", truncate(match[0], 200), `a[href="#${targetId}"]`));
+        "https://wave.webaim.org/api/references#e_skip_target_missing", truncate(match[0], 2000), `a[href="#${targetId}"]`));
     }
   }
 
@@ -704,13 +704,75 @@ function truncate(str: string, maxLen: number): string {
   return str.length <= maxLen ? str : str.slice(0, maxLen - 3) + "...";
 }
 
+function cssEscape(str: string): string {
+  return str.replace(/([^\w-])/g, "\\$1");
+}
+
+function getAttr(tag: string, attr: string): string | null {
+  const m = tag.match(new RegExp(`\\b${attr}\\s*=\\s*["']([^"']*)["']`, "i"));
+  return m ? m[1] : null;
+}
+
 function buildSelector(tag: string): string {
-  const id = tag.match(/id\s*=\s*["']([^"']+)["']/i);
-  if (id) return `#${id[1]}`;
-  const cls = tag.match(/class\s*=\s*["']([^"']+)["']/i);
-  if (cls) return `.${cls[1].split(/\s+/)[0]}`;
-  const tn = tag.match(/<(\w+)/);
-  return tn ? tn[1].toLowerCase() : "unknown";
+  const tagNameMatch = tag.match(/<(\w+)/);
+  const tagName = tagNameMatch ? tagNameMatch[1].toLowerCase() : "unknown";
+
+  // 1. ID — always unique
+  const id = getAttr(tag, "id");
+  if (id) return `#${cssEscape(id)}`;
+
+  // 2. Build a compound selector using distinguishing attributes
+  const parts: string[] = [tagName];
+
+  // type is critical for inputs (text, email, checkbox, radio, etc.)
+  const type = getAttr(tag, "type");
+  if (type) parts.push(`[type="${type}"]`);
+
+  // name uniquely identifies form controls in most forms
+  const name = getAttr(tag, "name");
+  if (name) parts.push(`[name="${name}"]`);
+
+  // href identifies specific links (including skip links)
+  const href = getAttr(tag, "href");
+  if (href) parts.push(`[href="${href}"]`);
+
+  // for identifies labels associated with specific controls
+  const forAttr = getAttr(tag, "for");
+  if (forAttr) parts.push(`[for="${forAttr}"]`);
+
+  // role distinguishes elements with ARIA roles
+  const role = getAttr(tag, "role");
+  if (role) parts.push(`[role="${role}"]`);
+
+  // aria-label uniquely identifies elements in many cases
+  const ariaLabel = getAttr(tag, "aria-label");
+  if (ariaLabel) parts.push(`[aria-label="${ariaLabel}"]`);
+
+  // placeholder distinguishes text inputs
+  const placeholder = getAttr(tag, "placeholder");
+  if (placeholder) parts.push(`[placeholder="${placeholder}"]`);
+
+  // title provides accessible name
+  const title = getAttr(tag, "title");
+  if (title) parts.push(`[title="${title}"]`);
+
+  // value distinguishes buttons/inputs
+  const value = getAttr(tag, "value");
+  if (value && (tagName === "input" || tagName === "button")) parts.push(`[value="${value}"]`);
+
+  // src identifies images
+  const src = getAttr(tag, "src");
+  if (src && (tagName === "img" || tagName === "input")) parts.push(`[src="${src}"]`);
+
+  // If we have at least one distinguishing attribute, return the compound selector
+  if (parts.length > 1) return parts.join("");
+
+  // 3. Fall back to first class
+  const cls = getAttr(tag, "class");
+  if (cls) return `.${cssEscape(cls.split(/\s+/)[0])}`;
+
+  // 4. Last resort: tag name only
+  return tagName;
 }
 
 function cssEscape(str: string): string {
