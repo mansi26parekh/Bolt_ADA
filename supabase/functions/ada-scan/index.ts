@@ -774,7 +774,3 @@ function buildSelector(tag: string): string {
   // 4. Last resort: tag name only
   return tagName;
 }
-
-function cssEscape(str: string): string {
-  return str.replace(/([^\w-])/g, "\\$1");
-}
