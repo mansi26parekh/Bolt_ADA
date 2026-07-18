@@ -490,19 +490,19 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                       </div>
 
                                       {/* Metadata chips row */}
-                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 pb-2">
+                                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 px-4 pb-2">
                                         {tagEl && (
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">HTML Element</span>
-                                            <code className="text-[11px] font-mono font-bold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded">
+                                            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">HTML Element</span>
+                                            <code className="text-[12px] font-mono font-extrabold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded">
                                               {tagEl}
                                             </code>
                                           </div>
                                         )}
                                         {result.selector && (
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Selector</span>
-                                            <code className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded max-w-[220px] truncate">
+                                            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Selector</span>
+                                            <code className="text-[12px] font-mono font-extrabold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded max-w-[220px] truncate">
                                               {result.selector}
                                             </code>
                                           </div>
