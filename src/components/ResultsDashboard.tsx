@@ -18,7 +18,6 @@ import {
   Download,
   FileCode,
   Wrench,
-  ExternalLink,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
