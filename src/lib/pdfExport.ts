@@ -168,11 +168,13 @@ export function generateDeveloperReport(scanData: ScanData) {
         ? r.element.replace(/\s+/g," ").trim()
         : r.selector || "";
       return {
-        title:  r.title,
-        impact: lvl,
+        title:    r.title,
+        impact:   lvl,
         el,
-        fix:    suggestedFix(r),
-        url:    `${page.url}#ada-selector=${encodeURIComponent(r.selector||r.element||"")}`,
+        selector: r.selector || "",
+        desc:     r.description || "",
+        fix:      suggestedFix(r),
+        pageUrl:  page.url,
       };
     });
     return {
@@ -306,13 +308,51 @@ a{color:var(--blue);text-decoration:none}
          max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
          border:1px solid #ccdaf5;cursor:default}
 
-/* ── Inspect link ── */
-.inspect-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
-              color:var(--blue);padding:4px 10px;border-radius:6px;border:1px solid var(--blue-mid);
-              background:var(--blue-light);white-space:nowrap;transition:background .15s,transform .1s}
-.inspect-link:hover{background:#bfdbfe;transform:translateY(-1px)}
-.inspect-link svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;
-                  stroke-linecap:round;stroke-linejoin:round}
+/* ── Inspect button ── */
+.inspect-btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
+            color:var(--blue);padding:4px 10px;border-radius:6px;border:1px solid var(--blue-mid);
+            background:var(--blue-light);white-space:nowrap;cursor:pointer;
+            transition:background .15s,transform .1s;font-family:inherit}
+.inspect-btn:hover{background:#bfdbfe;transform:translateY(-1px)}
+.inspect-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;
+                stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);
+               display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal-overlay.show{display:flex;animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border-radius:14px;max-width:560px;width:100%;
+       box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-head{padding:16px 20px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;
+            display:flex;align-items:center;justify-content:space-between}
+.modal-head h3{font-size:15px;font-weight:700}
+.modal-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;
+             border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;
+             justify-content:center;transition:background .15s}
+.modal-close:hover{background:rgba(255,255,255,.35)}
+.modal-body{padding:20px}
+.modal-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+             color:var(--muted);margin-bottom:6px;margin-top:14px}
+.modal-label:first-child{margin-top:0}
+.modal-desc{font-size:12px;color:#475569;line-height:1.6}
+.code-block{font-family:"SF Mono",Menlo,Monaco,Consolas,monospace;font-size:11px;color:#1e293b;
+            background:#f1f6fc;border:1px solid var(--border);border-radius:8px;
+            padding:10px 12px;white-space:pre-wrap;word-break:break-all;line-height:1.5;
+            position:relative}
+.copy-btn{position:absolute;top:8px;right:8px;background:var(--blue);color:#fff;border:none;
+          padding:4px 10px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;
+          font-family:inherit;transition:background .15s}
+.copy-btn:hover{background:#1e40af}
+.copy-btn.copied{background:#059669}
+.modal-actions{display:flex;gap:10px;margin-top:18px}
+.modal-btn{flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+           border:1px solid var(--border);background:var(--surface);color:var(--text);
+           transition:all .15s;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+.modal-btn:hover{background:var(--surface2)}
+.modal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.modal-btn.primary:hover{background:#1e40af}
 
 /* ── Status ── */
 .status-open{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;
@@ -394,6 +434,29 @@ a{color:var(--blue);text-decoration:none}
   </div>
 </div>
 
+<div class="modal-overlay" id="inspect-modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-title">Inspect Issue</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-label">Issue</div>
+      <div class="modal-desc" id="modal-issue"></div>
+      <div class="modal-label">Description</div>
+      <div class="modal-desc" id="modal-desc"></div>
+      <div class="modal-label">CSS Selector</div>
+      <div class="code-block" id="modal-selector"><button class="copy-btn" onclick="copyText(this,'modal-selector')">Copy</button></div>
+      <div class="modal-label">DevTools Console Command</div>
+      <div class="code-block" id="modal-cmd"><button class="copy-btn" onclick="copyText(this,'modal-cmd')">Copy</button></div>
+      <div class="modal-actions">
+        <button class="modal-btn" onclick="openPage()">Open Page &rarr;</button>
+        <button class="modal-btn primary" onclick="copyAndOpen()">Copy Command &amp; Open Page</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   var DATA = ${pageDataJson};
@@ -415,8 +478,69 @@ a{color:var(--blue);text-decoration:none}
   }
 
   function inspectIcon(){
-    return '<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+    return '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
   }
+
+  var currentIssue = null;
+
+  function buildConsoleCmd(sel){
+    if(!sel) return "document.body";
+    var s = sel.replace(/'/g,"\\'");
+    return "var el=document.querySelector('"+s+"');if(el){el.style.outline='4px solid #dc2626';el.style.outlineOffset='2px';el.scrollIntoView({behavior:'smooth',block:'center'});console.log('ADA Scanner: element highlighted',el);}else{console.warn('ADA Scanner: element not found for selector: "+s+"');}";
+  }
+
+  window.openInspect = function(pageIdx, rowIdx){
+    var p = DATA[pageIdx];
+    if(!p) return;
+    var r = p.rows[rowIdx];
+    if(!r) return;
+    currentIssue = r;
+    document.getElementById('modal-title').textContent = r.title || 'Inspect Issue';
+    document.getElementById('modal-issue').textContent = r.title || '—';
+    document.getElementById('modal-desc').textContent = r.desc || 'No description available.';
+    var selEl = document.getElementById('modal-selector');
+    selEl.innerHTML = '<button class="copy-btn" onclick="copyText(this,\'modal-selector\')">Copy</button>' + esc(r.selector || r.el || 'No selector available');
+    var cmdEl = document.getElementById('modal-cmd');
+    var cmd = buildConsoleCmd(r.selector || r.el || '');
+    cmdEl.innerHTML = '<button class="copy-btn" onclick="copyText(this,\'modal-cmd\')">Copy</button>' + esc(cmd);
+    document.getElementById('inspect-modal').classList.add('show');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeModal = function(){
+    document.getElementById('inspect-modal').classList.remove('show');
+    document.body.style.overflow = '';
+  };
+
+  window.copyText = function(btn, elId){
+    var el = document.getElementById(elId);
+    var text = el.textContent.replace(/^Copy/, '').trim();
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent='Copy'; btn.classList.remove('copied'); },1500);
+  };
+
+  window.openPage = function(){
+    if(currentIssue && currentIssue.pageUrl) window.open(currentIssue.pageUrl, '_blank');
+  };
+
+  window.copyAndOpen = function(){
+    var cmdEl = document.getElementById('modal-cmd');
+    var cmd = cmdEl.textContent.replace(/^Copy/, '').trim();
+    var ta = document.createElement('textarea');
+    ta.value = cmd;
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+    window.open(currentIssue.pageUrl, '_blank');
+  };
 
   function renderPage(pg){
     var start = pg * PER_PAGE;
@@ -430,7 +554,7 @@ a{color:var(--blue);text-decoration:none}
       var scBorder = scColor;
 
       var rowsHtml = "";
-      p.rows.forEach(function(r){
+      p.rows.forEach(function(r, ri){
         var lvl = r.impact;
         var col = COLORS[lvl] || "#2563eb";
         var lbl = LABELS[lvl] || lvl;
@@ -441,7 +565,7 @@ a{color:var(--blue);text-decoration:none}
           "<td><span class='badge badge-" + lvl + "'>" + lbl + "</span></td>" +
           "<td><span class='el-code' title='" + esc(r.el) + "'>" + el + "</span></td>" +
           "<td style='color:#475569'>" + esc(r.fix) + "</td>" +
-          "<td><a href='" + esc(r.url) + "' target='_blank' class='inspect-link'>" + inspectIcon() + " Inspect</a></td>" +
+          "<td><button class='inspect-btn' onclick='openInspect(" + (start+i) + "," + ri + ")'>" + inspectIcon() + " Inspect</button></td>" +
           "<td><span class='status-open'>Open</span></td>" +
           "</tr>";
       });
