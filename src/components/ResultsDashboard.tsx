@@ -316,6 +316,30 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                     <div className="flex items-center justify-between">
                                       <p className="text-[10px] text-slate-500 font-medium">Instance {idx + 1}</p>
                                       <div className="flex items-center gap-1.5">
+                                        {result.help_url && (
+                                          <div className="relative group/fix">
+                                            <button
+                                              type="button"
+                                              className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
+                                            >
+                                              <Wrench className="w-3 h-3" />
+                                              Fix
+                                            </button>
+                                            <div className="absolute z-50 bottom-full right-0 mb-2 w-72 p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
+                                              <div className="flex items-center gap-1.5 mb-1.5">
+                                                <Wrench className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                <span className="text-[11px] font-semibold text-emerald-300">Recommended fix</span>
+                                              </div>
+                                              <p className="text-[11px] text-slate-300 leading-relaxed">
+                                                {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
+                                              </p>
+                                              <p className="mt-2 text-[10px] text-slate-500 leading-relaxed italic">
+                                                {result.description}
+                                              </p>
+                                              <div className="absolute top-full right-3 -mt-px border-4 border-transparent border-t-slate-700" />
+                                            </div>
+                                          </div>
+                                        )}
                                         <button
                                           onClick={() => openInspect(result, page.url)}
                                           onMouseEnter={() => setHoverInspect(result.id)}
@@ -330,30 +354,6 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                           <ScanSearch className="w-3 h-3" />
                                           Inspect
                                         </button>
-                                        {result.help_url && (
-                                          <div className="relative group/fix">
-                                            <button
-                                              type="button"
-                                              className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
-                                            >
-                                              <Wrench className="w-3 h-3" />
-                                              Fix
-                                            </button>
-                                            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
-                                              <div className="flex items-center gap-1.5 mb-1.5">
-                                                <Wrench className="w-3 h-3 text-emerald-400 shrink-0" />
-                                                <span className="text-[11px] font-semibold text-emerald-300">Recommended fix</span>
-                                              </div>
-                                              <p className="text-[11px] text-slate-300 leading-relaxed">
-                                                {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
-                                              </p>
-                                              <p className="mt-2 text-[10px] text-slate-500 leading-relaxed italic">
-                                                {result.description}
-                                              </p>
-                                              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-700" />
-                                            </div>
-                                          </div>
-                                        )}
                                       </div>
                                     </div>
                                     <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
