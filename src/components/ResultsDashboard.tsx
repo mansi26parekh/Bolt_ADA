@@ -176,8 +176,94 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Pages Tab */}
+      <div className="max-w-6xl mx-auto px-6 py-6 space-y-4">
+
+        {/* ── Hero summary banner ── */}
+        {(() => {
+          const totalIssues = results.length;
+          const affectedPages = pages.filter((p) => p.violation_count > 0).length;
+          const score = scan.accessibility_score ?? null;
+          const hasCritical = violationsByImpact.critical > 0;
+          const hasSerious = violationsByImpact.serious > 0;
+          const dominantLabel = hasCritical
+            ? "Critical Accessibility Issues"
+            : hasSerious
+            ? "Serious Accessibility Issues"
+            : totalIssues > 0
+            ? "Accessibility Issues Found"
+            : "No Accessibility Issues";
+          const dominantColor = hasCritical
+            ? "text-red-400"
+            : hasSerious
+            ? "text-orange-400"
+            : totalIssues > 0
+            ? "text-amber-400"
+            : "text-emerald-400";
+          const heroBg = hasCritical
+            ? "bg-red-500/10 border-red-500/20"
+            : hasSerious
+            ? "bg-orange-500/10 border-orange-500/20"
+            : totalIssues > 0
+            ? "bg-amber-500/10 border-amber-500/20"
+            : "bg-emerald-500/10 border-emerald-500/20";
+          const IconComp = hasCritical ? AlertOctagon : hasSerious ? AlertTriangle : totalIssues > 0 ? AlertCircle : CheckCircle2;
+          const iconColor = hasCritical ? "text-red-400" : hasSerious ? "text-orange-400" : totalIssues > 0 ? "text-amber-400" : "text-emerald-400";
+          return (
+            <div className={`rounded-xl border p-4 flex items-center justify-between gap-4 ${heroBg}`}>
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-slate-900/60 border border-slate-700/50 shrink-0`}>
+                  <IconComp className={`w-6 h-6 ${iconColor}`} />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-white">{dominantLabel}</h2>
+                  <p className={`text-sm font-semibold mt-0.5 ${dominantColor}`}>
+                    {totalIssues} Need Fixes{" "}
+                    <span className="text-slate-400 font-normal text-xs">
+                      (across {affectedPages} page{affectedPages !== 1 ? "s" : ""})
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-xs text-slate-500 mb-0.5">Score</p>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-3xl font-bold ${scoreColor(score)}`}>
+                    {score !== null ? score : "—"}
+                  </span>
+                  <span className="text-sm text-slate-500">/100</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── 4 severity cards ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(["critical", "serious", "moderate", "minor"] as ImpactLevel[]).map((level) => {
+            const cfg = impactConfig[level];
+            const count = violationsByImpact[level];
+            const isActive = impactFilter === level;
+            return (
+              <button
+                key={level}
+                onClick={() => setImpactFilter((prev) => (prev === level ? "all" : level))}
+                className={`rounded-xl border p-4 flex flex-col gap-2 text-left transition-all ${
+                  isActive
+                    ? `${cfg.bg} border-current ${cfg.color}`
+                    : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
+                }`}
+              >
+                <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
+                <div>
+                  <p className={`text-2xl font-bold ${cfg.color}`}>{count}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{cfg.label}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Pages list ── */}
         <div className="space-y-4">
           <div className="flex items-center justify-end">
             <div className="relative">
