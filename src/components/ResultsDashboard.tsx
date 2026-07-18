@@ -350,68 +350,127 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                             </button>
                             {/* Individual instances */}
                             {groupExpanded && (
-                              <div className="divide-y divide-slate-800/50">
-                                {group.map((result, idx) => (
-                                  <div
-                                    key={result.id}
-                                    className={`px-3 py-2 pl-9 bg-slate-900/70 space-y-1.5 transition-colors ${
-                                      hoverInspect === result.id ? "bg-red-500/5" : ""
-                                    }`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-[10px] text-slate-500 font-medium">Instance {idx + 1}</p>
-                                      <div className="flex items-center gap-1.5">
-                                        {result.help_url && (
-                                          <div className="relative group/fix">
-                                            <button
-                                              type="button"
-                                              className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
-                                            >
-                                              <Wrench className="w-3 h-3" />
-                                              Fix
-                                            </button>
-                                            <div className="absolute z-50 bottom-full right-0 mb-2 w-72 p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
-                                              <div className="flex items-center gap-1.5 mb-1.5">
-                                                <Wrench className="w-3 h-3 text-emerald-400 shrink-0" />
-                                                <span className="text-[11px] font-semibold text-emerald-300">Recommended fix</span>
+                              <div className="divide-y divide-slate-800/60">
+                                {group.map((result, idx) => {
+                                  const instanceNum = String(idx + 1).padStart(2, "0");
+                                  const impactColor =
+                                    result.impact === "critical" ? "border-l-red-500" :
+                                    result.impact === "serious"  ? "border-l-orange-500" :
+                                    result.impact === "moderate" ? "border-l-amber-500" :
+                                                                   "border-l-blue-500";
+                                  const numBg =
+                                    result.impact === "critical" ? "bg-red-500/20 text-red-300 border-red-500/40" :
+                                    result.impact === "serious"  ? "bg-orange-500/20 text-orange-300 border-orange-500/40" :
+                                    result.impact === "moderate" ? "bg-amber-500/20 text-amber-300 border-amber-500/40" :
+                                                                   "bg-blue-500/20 text-blue-300 border-blue-500/40";
+                                  const tagEl = result.element
+                                    ? result.element.match(/^<(\w+)/)?.[1]
+                                      ? `<${result.element.match(/^<(\w+)/)![1]}>`
+                                      : null
+                                    : null;
+                                  const locationPath = (() => {
+                                    try {
+                                      return new URL(page.url).pathname;
+                                    } catch {
+                                      return page.url;
+                                    }
+                                  })();
+
+                                  return (
+                                    <div
+                                      key={result.id}
+                                      className={`bg-slate-900/60 border-l-4 ${impactColor} transition-colors hover:bg-slate-800/40`}
+                                    >
+                                      {/* Instance header row */}
+                                      <div className="flex items-start gap-3 px-4 pt-3 pb-2">
+                                        <span className={`shrink-0 text-[11px] font-bold font-mono px-2 py-0.5 rounded border ${numBg}`}>
+                                          {instanceNum}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[12px] font-semibold text-slate-200 leading-snug mb-0.5">
+                                            Instance #{idx + 1}
+                                          </p>
+                                          <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                                          {result.help_url && (
+                                            <div className="relative group/fix">
+                                              <button
+                                                type="button"
+                                                className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
+                                              >
+                                                <Wrench className="w-3 h-3" />
+                                                Fix
+                                              </button>
+                                              <div className="absolute z-50 bottom-full right-0 mb-2 w-72 p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
+                                                <div className="flex items-center gap-1.5 mb-1.5">
+                                                  <Wrench className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                  <span className="text-[11px] font-semibold text-emerald-300">Recommended fix</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-300 leading-relaxed">
+                                                  {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
+                                                </p>
+                                                <p className="mt-2 text-[10px] text-slate-500 leading-relaxed italic">
+                                                  {result.description}
+                                                </p>
+                                                <div className="absolute top-full right-3 -mt-px border-4 border-transparent border-t-slate-700" />
                                               </div>
-                                              <p className="text-[11px] text-slate-300 leading-relaxed">
-                                                {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
-                                              </p>
-                                              <p className="mt-2 text-[10px] text-slate-500 leading-relaxed italic">
-                                                {result.description}
-                                              </p>
-                                              <div className="absolute top-full right-3 -mt-px border-4 border-transparent border-t-slate-700" />
                                             </div>
+                                          )}
+                                          <button
+                                            onClick={() => openInspect(result, page.url)}
+                                            onMouseEnter={() => setHoverInspect(result.id)}
+                                            onMouseLeave={() => setHoverInspect(null)}
+                                            className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md transition-colors ${
+                                              hoverInspect === result.id
+                                                ? "bg-red-500/20 text-red-300 border border-red-500/40"
+                                                : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30"
+                                            }`}
+                                            title="Inspect this element"
+                                          >
+                                            <ScanSearch className="w-3 h-3" />
+                                            Inspect
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {/* Metadata chips row */}
+                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 pb-2">
+                                        {tagEl && (
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">HTML Element</span>
+                                            <code className="text-[10px] font-mono text-slate-300 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded">
+                                              {tagEl}
+                                            </code>
                                           </div>
                                         )}
-                                        <button
-                                          onClick={() => openInspect(result, page.url)}
-                                          onMouseEnter={() => setHoverInspect(result.id)}
-                                          onMouseLeave={() => setHoverInspect(null)}
-                                          className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md transition-colors ${
-                                            hoverInspect === result.id
-                                              ? "bg-red-500/20 text-red-300 border border-red-500/40"
-                                              : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30"
-                                          }`}
-                                          title="Inspect this element"
-                                        >
-                                          <ScanSearch className="w-3 h-3" />
-                                          Inspect
-                                        </button>
+                                        {result.selector && (
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Selector</span>
+                                            <code className="text-[10px] font-mono text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 px-1.5 py-0.5 rounded max-w-[160px] truncate">
+                                              {result.selector}
+                                            </code>
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Location</span>
+                                          <span className="text-[10px] text-slate-400 font-mono max-w-[180px] truncate" title={locationPath}>
+                                            {locationPath}
+                                          </span>
+                                        </div>
                                       </div>
+
+                                      {/* HTML code block */}
+                                      {result.element && (
+                                        <div className="px-4 pb-3">
+                                          <pre className="text-[10px] text-orange-300/90 bg-slate-950/70 border border-slate-700/60 px-3 py-2.5 rounded-lg overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">
+                                            {result.element}
+                                          </pre>
+                                        </div>
+                                      )}
                                     </div>
-                                    <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
-                                    {result.element && (
-                                      <code className="text-[10px] text-slate-400 bg-slate-800/60 px-2 py-1 rounded block break-all font-mono">
-                                        {result.element}
-                                      </code>
-                                    )}
-                                    {result.selector && (
-                                      <p className="text-[10px] text-slate-500 font-mono">{result.selector}</p>
-                                    )}
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
