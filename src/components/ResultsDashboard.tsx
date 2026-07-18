@@ -22,6 +22,68 @@ import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
 import { generateDeveloperReport } from "../lib/pdfExport";
 
+// Lightweight HTML syntax highlighter — colors tags, attributes, strings, comments.
+const TAG_COLORS: Record<string, string> = {
+  html: "text-red-400", head: "text-red-400", body: "text-red-400",
+  div: "text-rose-400", span: "text-rose-400", p: "text-rose-400",
+  a: "text-blue-400", img: "text-emerald-400", input: "text-emerald-400",
+  button: "text-amber-400", label: "text-amber-400",
+  h1: "text-purple-400", h2: "text-purple-400", h3: "text-purple-400",
+  h4: "text-purple-400", h5: "text-purple-400", h6: "text-purple-400",
+  ul: "text-cyan-400", ol: "text-cyan-400", li: "text-cyan-400",
+  table: "text-cyan-400", tr: "text-cyan-400", td: "text-cyan-400", th: "text-cyan-400",
+  form: "text-amber-400", select: "text-amber-400", option: "text-amber-400",
+  textarea: "text-amber-400", fieldset: "text-amber-400", legend: "text-amber-400",
+  nav: "text-sky-400", header: "text-sky-400", footer: "text-sky-400",
+  main: "text-sky-400", section: "text-sky-400", article: "text-sky-400",
+  aside: "text-sky-400",
+  svg: "text-teal-400", path: "text-teal-400", circle: "text-teal-400",
+  iframe: "text-orange-400", video: "text-orange-400", audio: "text-orange-400",
+  script: "text-yellow-400", style: "text-yellow-400", link: "text-yellow-400",
+  meta: "text-yellow-400", title: "text-yellow-400",
+};
+
+function HighlightedHtml({ html }: { html: string }) {
+  const tokens: React.ReactNode[] = [];
+  const regex = /(<!--[\s\S]*?-->)|(<\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?>)|("[^"]*"|'[^']*')|([^<]+)/g;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = regex.exec(html)) !== null) {
+    if (m[1]) {
+      tokens.push(<span key={key++} className="text-slate-500 italic">{m[1]}</span>);
+    } else if (m[2]) {
+      const slash = m[2];
+      const tag = m[3].toLowerCase();
+      const attrs = m[4];
+      const close = m[5];
+      const tagColor = TAG_COLORS[tag] || "text-pink-400";
+      tokens.push(<span key={key++} className="text-slate-500">{slash}</span>);
+      tokens.push(<span key={key++} className={tagColor}>{tag}</span>);
+      if (attrs) {
+        const attrRegex = /\s([a-zA-Z_:][\w:-]*)(=("[^"]*"|'[^']*'))?/g;
+        let am: RegExpExecArray | null;
+        let last = 0;
+        while ((am = attrRegex.exec(attrs)) !== null) {
+          if (am.index > last) tokens.push(<span key={key++} className="text-slate-400">{attrs.slice(last, am.index)}</span>);
+          tokens.push(<span key={key++} className="text-sky-300">{am[1]}</span>);
+          if (am[2]) {
+            tokens.push(<span key={key++} className="text-slate-400">=</span>);
+            tokens.push(<span key={key++} className="text-emerald-300">{am[3]}</span>);
+          }
+          last = am.index + am[0].length;
+        }
+        if (last < attrs.length) tokens.push(<span key={key++} className="text-slate-400">{attrs.slice(last)}</span>);
+      }
+      tokens.push(<span key={key++} className="text-slate-500">{close}</span>);
+    } else if (m[6]) {
+      tokens.push(<span key={key++} className="text-emerald-300">{m[6]}</span>);
+    } else if (m[7]) {
+      tokens.push(<span key={key++} className="text-slate-300">{m[7]}</span>);
+    }
+  }
+  return <>{tokens}</>;
+}
+
 interface ResultsDashboardProps {
   scanData: ScanData;
   onReset: () => void;
@@ -368,13 +430,6 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                       ? `<${result.element.match(/^<(\w+)/)![1]}>`
                                       : null
                                     : null;
-                                  const locationPath = (() => {
-                                    try {
-                                      return new URL(page.url).pathname;
-                                    } catch {
-                                      return page.url;
-                                    }
-                                  })();
 
                                   return (
                                     <div
@@ -387,10 +442,10 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                           {instanceNum}
                                         </span>
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-[12px] font-semibold text-slate-200 leading-snug mb-0.5">
+                                          <p className="text-[12px] font-semibold text-slate-200 leading-snug mb-1">
                                             Instance #{idx + 1}
                                           </p>
-                                          <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
+                                          <p className="text-[13px] text-slate-300 leading-relaxed">{result.description}</p>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
                                           {result.help_url && (
@@ -438,33 +493,27 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 pb-2">
                                         {tagEl && (
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">HTML Element</span>
-                                            <code className="text-[10px] font-mono text-slate-300 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">HTML Element</span>
+                                            <code className="text-[11px] font-mono font-bold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded">
                                               {tagEl}
                                             </code>
                                           </div>
                                         )}
                                         {result.selector && (
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Selector</span>
-                                            <code className="text-[10px] font-mono text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 px-1.5 py-0.5 rounded max-w-[160px] truncate">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Selector</span>
+                                            <code className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded max-w-[220px] truncate">
                                               {result.selector}
                                             </code>
                                           </div>
                                         )}
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Location</span>
-                                          <span className="text-[10px] text-slate-400 font-mono max-w-[180px] truncate" title={locationPath}>
-                                            {locationPath}
-                                          </span>
-                                        </div>
                                       </div>
 
                                       {/* HTML code block */}
                                       {result.element && (
                                         <div className="px-4 pb-3">
-                                          <pre className="text-[10px] text-orange-300/90 bg-slate-950/70 border border-slate-700/60 px-3 py-2.5 rounded-lg overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">
-                                            {result.element}
+                                          <pre className="text-[11px] bg-slate-950/70 border border-slate-700/60 px-3 py-2.5 rounded-lg overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed">
+                                            <HighlightedHtml html={result.element} />
                                           </pre>
                                         </div>
                                       )}
