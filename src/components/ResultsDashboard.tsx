@@ -347,15 +347,9 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                               <p className="text-[11px] text-slate-300 leading-relaxed">
                                                 {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
                                               </p>
-                                              <a
-                                                href={result.help_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="mt-2 inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300"
-                                              >
-                                                Full reference
-                                                <ExternalLink className="w-2.5 h-2.5" />
-                                              </a>
+                                              <p className="mt-2 text-[10px] text-slate-500 leading-relaxed italic">
+                                                {result.description}
+                                              </p>
                                               <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-700" />
                                             </div>
                                           </div>
