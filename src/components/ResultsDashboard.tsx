@@ -203,15 +203,15 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                 </div>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-xs text-slate-500 mb-0.5">Pages</p>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-bold text-emerald-400">{passedPages}</span>
-                  <span className="text-sm text-slate-500">pass</span>
-                  <span className="text-slate-600 mx-0.5">/</span>
-                  <span className="text-2xl font-bold text-red-400">{failedPages}</span>
-                  <span className="text-sm text-slate-500">fail</span>
+                <p className="text-sm font-semibold text-slate-300 mb-1">Pages</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-emerald-400">{passedPages}</span>
+                  <span className="text-base font-semibold text-emerald-400/80">pass</span>
+                  <span className="text-slate-600 mx-1 text-lg">/</span>
+                  <span className="text-4xl font-extrabold text-red-400">{failedPages}</span>
+                  <span className="text-base font-semibold text-red-400/80">fail</span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-0.5">of {totalPages} total</p>
+                <p className="text-xs font-medium text-slate-400 mt-1">of {totalPages} total</p>
               </div>
             </div>
           );
