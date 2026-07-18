@@ -490,7 +490,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                       </div>
 
                                       {/* Metadata chips row */}
-                                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 px-4 pb-2">
+                                      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 px-4 pb-2">
                                         {tagEl && (
                                           <div className="flex items-center gap-1.5">
                                             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">HTML Element</span>
