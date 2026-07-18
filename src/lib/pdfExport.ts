@@ -108,74 +108,212 @@ function severityGrid(counts: Record<ImpactLevel, number>) {
   }).join("")}</div>`;
 }
 
+// Map common axe rule IDs to actionable developer fix suggestions
+const RULE_FIXES: Record<string, string> = {
+  "image-alt": "Add descriptive alt attribute to <img> element",
+  "label": "Associate a <label> with the form control using for/id or aria-label",
+  "color-contrast": "Increase text-to-background color contrast ratio to ≥ 4.5:1",
+  "link-name": "Add descriptive text or aria-label to the anchor element",
+  "button-name": "Add visible text or aria-label to the button element",
+  "html-has-lang": "Add lang attribute to <html> element (e.g. lang=\"en\")",
+  "document-title": "Add a descriptive <title> element inside <head>",
+  "frame-title": "Add a title attribute to all <iframe> and <frame> elements",
+  "duplicate-id": "Ensure all id attribute values are unique within the document",
+  "aria-roles": "Use a valid WAI-ARIA role value on the element",
+  "aria-required-attr": "Add all required ARIA attributes for this role",
+  "aria-valid-attr-value": "Fix the ARIA attribute value to match the expected type",
+  "landmark-one-main": "Add a <main> landmark to the page structure",
+  "region": "Wrap content in landmark regions (main, nav, header, footer)",
+  "skip-link": "Add a skip-navigation link as the first focusable element",
+  "tabindex": "Remove tabindex > 0; use tabindex=\"0\" or \"-1\" only",
+  "heading-order": "Use heading levels in sequential order (h1→h2→h3…)",
+  "list": "Ensure list children are only <li>, <script>, or <template> elements",
+  "listitem": "Place <li> elements only inside <ul> or <ol>",
+  "td-headers-attr": "Ensure all td headers attributes reference existing th ids",
+  "th-has-data-cells": "Ensure each <th> has associated data cells",
+  "select-name": "Add aria-label or <label> to <select> element",
+  "input-image-alt": "Add alt attribute to <input type=\"image\">",
+  "object-alt": "Add body text or title attribute to <object> element",
+  "video-caption": "Add captions track to <video> element",
+  "audio-caption": "Add captions or transcript to <audio> element",
+  "meta-refresh": "Do not use <meta http-equiv=\"refresh\"> for automatic redirects",
+  "meta-viewport": "Remove user-scalable=no from viewport meta tag",
+  "focus-order-semantics": "Ensure interactive elements receive focus in a logical order",
+  "scrollable-region-focusable": "Make scrollable region focusable with tabindex=\"0\"",
+};
+
+function suggestedFix(result: ScanResult): string {
+  if (RULE_FIXES[result.rule_id]) return RULE_FIXES[result.rule_id];
+  // Fallback: strip the axe description prefix and return it
+  const d = result.description || "";
+  return d.length > 90 ? d.slice(0, 87) + "…" : d || "Review and remediate per WCAG guidelines";
+}
+
+const DEV_CSS = `
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1e293b;background:#eef2f8;line-height:1.5;padding:32px 40px;font-size:13px}
+a{color:#1d4ed8;text-decoration:none}
+/* Header */
+.report-header{margin-bottom:24px}
+.report-title{font-size:22px;font-weight:800;color:#1d4ed8;margin-bottom:6px}
+.report-meta{font-size:12px;color:#475569;line-height:1.8}
+.report-meta strong{color:#1e293b;font-weight:600}
+/* Summary table */
+.summary-section{margin-bottom:28px}
+.section-heading{font-size:15px;font-weight:700;color:#1d4ed8;margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid #c7d8f0}
+.summary-table{width:100%;border-collapse:collapse;background:#dce8f5;border-radius:8px;overflow:hidden}
+.summary-table th{padding:9px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569;background:#d0dfee;text-align:left;border-bottom:1px solid #b8cfe4}
+.summary-table td{padding:10px 14px;font-size:15px;font-weight:700;color:#1e293b;border-bottom:1px solid #c7d8f0}
+.summary-table tr:last-child td{border-bottom:none}
+.c-critical{color:#dc2626}
+.c-serious{color:#ea580c}
+.c-moderate{color:#d97706}
+.c-minor{color:#2563eb}
+/* Page-wise section */
+.pages-section{margin-bottom:0}
+.page-block{margin-bottom:20px;background:#dce8f5;border-radius:10px;overflow:hidden;border:1px solid #b8cfe4}
+.page-heading{padding:10px 16px;background:#c7d8f0;border-bottom:1px solid #b8cfe4;display:flex;align-items:baseline;gap:10px}
+.page-name{font-size:13px;font-weight:700;color:#1d4ed8}
+.page-url{font-size:11px;color:#64748b}
+.page-score{margin-left:auto;font-size:12px;font-weight:600}
+/* Issues table */
+.issues-table{width:100%;border-collapse:collapse}
+.issues-table th{padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;background:#d0dfee;text-align:left;border-bottom:1px solid #b8cfe4}
+.issues-table td{padding:9px 12px;font-size:12px;color:#334155;border-bottom:1px solid #c7d8f0;vertical-align:top}
+.issues-table tr:last-child td{border-bottom:none}
+.issues-table tr:nth-child(even) td{background:#d6e4f2}
+/* Severity badges */
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap}
+.badge-critical{background:#dc2626}
+.badge-serious{background:#ea580c}
+.badge-moderate{background:#d97706}
+.badge-minor{background:#2563eb}
+/* Element code */
+.el-code{font-family:"SF Mono",Menlo,Monaco,Consolas,monospace;font-size:10px;color:#475569;background:#c2d5e8;padding:2px 5px;border-radius:4px;display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+/* Status */
+.status-open{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #fde68a;white-space:nowrap}
+/* Inspect link */
+.inspect-link{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:#1d4ed8;padding:3px 9px;border-radius:5px;border:1px solid #93c5fd;background:#dbeafe;white-space:nowrap}
+/* Footer */
+.report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #b8cfe4;font-size:10px;color:#94a3b8;text-align:center}
+@media print{
+  body{padding:16px 20px;background:#eef2f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page-block{break-inside:avoid}
+}
+`;
+
 export function generateDeveloperReport(scanData: ScanData) {
   const { scan, pages, results } = scanData;
+
   const counts: Record<ImpactLevel, number> = { critical:0, serious:0, moderate:0, minor:0 };
   results.forEach(r => { counts[r.impact as ImpactLevel]++; });
 
-  const catCounts = results.reduce<Record<string,number>>((a,r) => { a[r.category]=(a[r.category]||0)+1; return a; },{});
+  const pagesWithIssues = pages.filter(p => p.violation_count > 0);
 
-  const pageSections = pages
-    .filter(p => p.violation_count > 0)
-    .map(page => {
-      const pr = results.filter(r => r.page_id === page.id);
-      const groups: Record<string, ScanResult[]> = {};
-      pr.forEach(r => { (groups[r.rule_id] ??= []).push(r); });
+  const pageSections = pagesWithIssues.map(page => {
+    const pageResults = results.filter(r => r.page_id === page.id);
 
-      const groupHtml = Object.entries(groups).map(([, grp]) => {
-        const lvl = (grp[0].impact as ImpactLevel) || "moderate";
-        const m = impactMeta[lvl] || impactMeta.moderate;
-        const instances = grp.map((r, i) => {
-          const inspectUrl = `${page.url}#ada-selector=${encodeURIComponent(r.selector||"")}`;
-          return `<div class="vrow" style="border-left-color:${m.color}">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-              <span class="badge" style="background:${m.color}">${m.label}</span>
-              <span class="vtitle">${esc(r.title)} <span style="color:#94a3b8;font-weight:400">— Instance ${i+1}</span></span>
-            </div>
-            <div class="vdesc">${esc(r.description)}</div>
-            ${r.element ? `<code class="vcode">${esc(r.element)}</code>` : ""}
-            ${r.selector ? `<div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-bottom:5px">Selector: ${esc(r.selector)}</div>` : ""}
-            <a href="${esc(inspectUrl)}" class="inspect">&#128269; Inspect Element</a>
-          </div>`;
-        }).join("");
-        return `<div style="margin-bottom:10px">
-          <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:5px">${esc(grp[0].title)} (${grp.length})</div>
-          ${instances}
-        </div>`;
-      }).join("");
+    const rows = pageResults.map(r => {
+      const lvl = (r.impact as ImpactLevel) || "moderate";
+      const m   = impactMeta[lvl];
+      const el  = r.element
+        ? r.element.replace(/\s+/g," ").trim().slice(0, 60) + (r.element.length > 60 ? "…" : "")
+        : r.selector || "—";
+      const fix = suggestedFix(r);
+      const inspectUrl = `${page.url}#ada-selector=${encodeURIComponent(r.selector||r.element||"")}`;
 
-      return `<div class="pg-sec">
-        <h3>${esc(page.title||page.url)} <span class="pg-url">— ${esc(page.url)}</span></h3>
-        <div style="font-size:11px;color:#64748b;margin-bottom:8px">
-          Score: <strong style="color:${scoreColor(page.score)}">${page.score??'N/A'}</strong>
-          &nbsp;&nbsp;Violations: <strong style="color:#dc2626">${page.violation_count}</strong>
-        </div>
-        ${groupHtml}
-      </div>`;
+      return `<tr>
+        <td style="font-weight:600;color:#1e293b">${esc(r.title)}</td>
+        <td><span class="badge badge-${lvl}">${m.label}</span></td>
+        <td><span class="el-code" title="${esc(el)}">${esc(el)}</span></td>
+        <td style="color:#475569">${esc(fix)}</td>
+        <td><a href="${esc(inspectUrl)}" class="inspect-link">Inspect Issue ↗</a></td>
+        <td><span class="status-open">Open</span></td>
+      </tr>`;
     }).join("");
 
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-    <title>Developer Report — ${esc(scan.url)}</title>
-    <style>${BASE_CSS}</style></head><body>
-    <div class="hdr">
-      <div class="hdr-logo">A</div>
-      <div><h1>ADA Accessibility — Developer Report</h1><div class="sub">Technical scan results with inspectable element references</div></div>
-    </div>
-    ${metaBar(scan)}
-    <div class="sec"><h2>Scan Summary</h2>
-      ${scoreBox(scan.score)}
-      ${severityGrid(counts)}
-      <table><thead><tr><th>WCAG Category</th><th>Violations</th></tr></thead><tbody>
-        ${Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<tr><td>${esc(c)}</td><td>${n}</td></tr>`).join("")}
-      </tbody></table>
-    </div>
-    <div class="sec"><h2>Detailed Issues by Page</h2>
-      ${pageSections || "<p style='color:#64748b;font-size:13px'>No violations detected.</p>"}
-    </div>
-    <div class="footer">Generated by ADA Scanner — Developer Report — ${fmtDate(new Date().toISOString())}</div>
-  </body></html>`;
+    const scoreVal = page.score ?? null;
+    const scoreC   = scoreColor(scoreVal);
 
-  const slug = scan.url.replace(/https?:\/\//,"").replace(/[^a-z0-9]/gi,"-").slice(0,40);
+    return `<div class="page-block">
+      <div class="page-heading">
+        <span class="page-name">${esc(page.title || page.url)}</span>
+        <span class="page-url">${esc(page.url)}</span>
+        <span class="page-score" style="color:${scoreC}">Score: ${scoreVal ?? "N/A"}</span>
+      </div>
+      <table class="issues-table">
+        <thead>
+          <tr>
+            <th style="width:22%">Issue</th>
+            <th style="width:10%">Severity</th>
+            <th style="width:20%">Affected Element</th>
+            <th style="width:26%">Suggested Fix</th>
+            <th style="width:13%">Inspect Issue</th>
+            <th style="width:9%">Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join("");
+
+  const domain = scan.url.replace(/https?:\/\//,"").replace(/\/.*$/,"");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Developer Report — ${esc(domain)}</title>
+<style>${DEV_CSS}</style>
+</head>
+<body>
+  <div class="report-header">
+    <div class="report-title">ADA Scanner - Developer Report</div>
+    <div class="report-meta">
+      <strong>Website:</strong> ${esc(domain)}<br>
+      <strong>Generated:</strong> ${fmtDate(new Date().toISOString())}<br>
+      <strong>Accessibility Score:</strong> ${scan.score ?? "N/A"}/100
+    </div>
+  </div>
+
+  <div class="summary-section">
+    <div class="section-heading">Summary</div>
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>Pages</th>
+          <th>Issues</th>
+          <th>Critical</th>
+          <th>Serious</th>
+          <th>Moderate</th>
+          <th>Minor</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${scan.pages_scanned}</td>
+          <td>${scan.total_violations}</td>
+          <td class="c-critical">${counts.critical}</td>
+          <td class="c-serious">${counts.serious}</td>
+          <td class="c-moderate">${counts.moderate}</td>
+          <td class="c-minor">${counts.minor}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pages-section">
+    <div class="section-heading">Page-wise Issues</div>
+    ${pageSections || "<p style='color:#64748b;padding:12px'>No violations detected.</p>"}
+  </div>
+
+  <div class="report-footer">
+    Generated by ADA Scanner — Developer Report — ${fmtDate(new Date().toISOString())}
+  </div>
+</body>
+</html>`;
+
+  const slug = domain.replace(/[^a-z0-9]/gi,"-").slice(0,40);
   downloadHtml(html, `developer-report-${slug}.html`);
 }
 
