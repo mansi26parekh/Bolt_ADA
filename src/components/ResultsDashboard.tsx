@@ -17,6 +17,7 @@ import {
   ScanSearch,
   Download,
   FileCode,
+  Wrench,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
@@ -281,20 +282,34 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                   >
                                     <div className="flex items-center justify-between">
                                       <p className="text-[10px] text-slate-500 font-medium">Instance {idx + 1}</p>
-                                      <button
-                                        onClick={() => openInspect(result, page.url)}
-                                        onMouseEnter={() => setHoverInspect(result.id)}
-                                        onMouseLeave={() => setHoverInspect(null)}
-                                        className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md transition-colors ${
-                                          hoverInspect === result.id
-                                            ? "bg-red-500/20 text-red-300 border border-red-500/40"
-                                            : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30"
-                                        }`}
-                                        title="Inspect this element"
-                                      >
-                                        <ScanSearch className="w-3 h-3" />
-                                        Inspect
-                                      </button>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          onClick={() => openInspect(result, page.url)}
+                                          onMouseEnter={() => setHoverInspect(result.id)}
+                                          onMouseLeave={() => setHoverInspect(null)}
+                                          className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md transition-colors ${
+                                            hoverInspect === result.id
+                                              ? "bg-red-500/20 text-red-300 border border-red-500/40"
+                                              : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30"
+                                          }`}
+                                          title="Inspect this element"
+                                        >
+                                          <ScanSearch className="w-3 h-3" />
+                                          Inspect
+                                        </button>
+                                        {result.help_url && (
+                                          <a
+                                            href={result.help_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
+                                            title="Recommended fix guidance"
+                                          >
+                                            <Wrench className="w-3 h-3" />
+                                            Fix
+                                          </a>
+                                        )}
+                                      </div>
                                     </div>
                                     <p className="text-[11px] text-slate-400 leading-relaxed">{result.description}</p>
                                     {result.element && (
