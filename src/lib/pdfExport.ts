@@ -153,7 +153,12 @@ export function generateDeveloperReport(scanData: ScanData) {
   const { scan, pages, results } = scanData;
 
   const counts: Record<ImpactLevel, number> = { critical:0, serious:0, moderate:0, minor:0 };
-  results.forEach(r => { counts[r.impact as ImpactLevel]++; });
+  results.forEach(r => {
+    const k = r.impact as ImpactLevel;
+    if (k in counts) counts[k]++;
+  });
+  const totalIssues = counts.critical + counts.serious + counts.moderate + counts.minor;
+  const totalPagesScanned = pages.length || scan.pages_scanned;
 
   // Derive pages from actual results (robust against stale violation_count)
   const pageMap = new Map<string, { url: string; title: string; score: number | null; count: number; rows: any[] }>();
@@ -413,14 +418,14 @@ a{color:var(--blue);text-decoration:none}
   <div class="meta-row">
     <div class="meta-chip"><strong>Website:</strong> ${esc(domain)}</div>
     <div class="meta-chip"><strong>Generated:</strong> ${fmtDate(new Date().toISOString())}</div>
-    <div class="meta-chip"><strong>Pages Scanned:</strong> ${scan.pages_scanned}</div>
+    <div class="meta-chip"><strong>Pages Scanned:</strong> ${totalPagesScanned}</div>
     <div class="meta-chip"><strong>Pages with Issues:</strong> ${totalPages}</div>
   </div>
 
   <div class="sec-head">Summary</div>
   <div class="summary-grid">
-    <div class="s-card c-pages"><div class="s-val" style="color:var(--blue)">${scan.pages_scanned}</div><div class="s-lbl">Pages</div></div>
-    <div class="s-card c-issues"><div class="s-val" style="color:#7c3aed">${scan.total_violations}</div><div class="s-lbl">Issues</div></div>
+    <div class="s-card c-pages"><div class="s-val" style="color:var(--blue)">${totalPagesScanned}</div><div class="s-lbl">Pages</div></div>
+    <div class="s-card c-issues"><div class="s-val" style="color:#7c3aed">${totalIssues}</div><div class="s-lbl">Issues</div></div>
     <div class="s-card c-critical"><div class="s-val" style="color:var(--critical)">${counts.critical}</div><div class="s-lbl">Critical</div></div>
     <div class="s-card c-serious"><div class="s-val" style="color:var(--serious)">${counts.serious}</div><div class="s-lbl">Serious</div></div>
     <div class="s-card c-moderate"><div class="s-val" style="color:var(--moderate)">${counts.moderate}</div><div class="s-lbl">Moderate</div></div>

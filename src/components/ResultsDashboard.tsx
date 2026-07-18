@@ -16,7 +16,6 @@ import {
   XCircle,
   ScanSearch,
   Download,
-  FileCode,
   Wrench,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
@@ -80,7 +79,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   const [inspectResult, setInspectResult] = useState<ScanResult | null>(null);
   const [inspectPageUrl, setInspectPageUrl] = useState<string | null>(null);
   const [hoverInspect, setHoverInspect] = useState<string | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
+
 
   const { scan, pages, results } = scanData;
 
@@ -246,33 +245,13 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
         {/* ── Pages list ── */}
         <div className="space-y-4">
           <div className="flex items-center justify-end">
-            <div className="relative">
-              <button
-                onClick={() => setExportOpen((p) => !p)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-              >
-                <Download className="w-4 h-4" />
-                Export Report
-                <ChevronDown className={`w-4 h-4 transition-transform ${exportOpen ? "rotate-180" : ""}`} />
-              </button>
-              {exportOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <button
-                      onClick={() => { setExportOpen(false); generateDeveloperReport(scanData); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-slate-200 hover:bg-slate-700/80 transition-colors"
-                    >
-                      <FileCode className="w-4 h-4 text-blue-400 shrink-0" />
-                      <div>
-                        <div className="font-medium">Developer Report</div>
-                        <div className="text-xs text-slate-500">Technical details with inspect links</div>
-                      </div>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              onClick={() => generateDeveloperReport(scanData)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Download Report
+            </button>
           </div>
           <div className="space-y-2">
             {pages.map((page) => {
