@@ -149,59 +149,6 @@ function suggestedFix(result: ScanResult): string {
   return d.length > 90 ? d.slice(0, 87) + "…" : d || "Review and remediate per WCAG guidelines";
 }
 
-const DEV_CSS = `
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1e293b;background:#eef2f8;line-height:1.5;padding:32px 40px;font-size:13px}
-a{color:#1d4ed8;text-decoration:none}
-/* Header */
-.report-header{margin-bottom:24px}
-.report-title{font-size:22px;font-weight:800;color:#1d4ed8;margin-bottom:6px}
-.report-meta{font-size:12px;color:#475569;line-height:1.8}
-.report-meta strong{color:#1e293b;font-weight:600}
-/* Summary table */
-.summary-section{margin-bottom:28px}
-.section-heading{font-size:15px;font-weight:700;color:#1d4ed8;margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid #c7d8f0}
-.summary-table{width:100%;border-collapse:collapse;background:#dce8f5;border-radius:8px;overflow:hidden}
-.summary-table th{padding:9px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569;background:#d0dfee;text-align:left;border-bottom:1px solid #b8cfe4}
-.summary-table td{padding:10px 14px;font-size:15px;font-weight:700;color:#1e293b;border-bottom:1px solid #c7d8f0}
-.summary-table tr:last-child td{border-bottom:none}
-.c-critical{color:#dc2626}
-.c-serious{color:#ea580c}
-.c-moderate{color:#d97706}
-.c-minor{color:#2563eb}
-/* Page-wise section */
-.pages-section{margin-bottom:0}
-.page-block{margin-bottom:20px;background:#dce8f5;border-radius:10px;overflow:hidden;border:1px solid #b8cfe4}
-.page-heading{padding:10px 16px;background:#c7d8f0;border-bottom:1px solid #b8cfe4;display:flex;align-items:baseline;gap:10px}
-.page-name{font-size:13px;font-weight:700;color:#1d4ed8}
-.page-url{font-size:11px;color:#64748b}
-.page-score{margin-left:auto;font-size:12px;font-weight:600}
-/* Issues table */
-.issues-table{width:100%;border-collapse:collapse}
-.issues-table th{padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;background:#d0dfee;text-align:left;border-bottom:1px solid #b8cfe4}
-.issues-table td{padding:9px 12px;font-size:12px;color:#334155;border-bottom:1px solid #c7d8f0;vertical-align:top}
-.issues-table tr:last-child td{border-bottom:none}
-.issues-table tr:nth-child(even) td{background:#d6e4f2}
-/* Severity badges */
-.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap}
-.badge-critical{background:#dc2626}
-.badge-serious{background:#ea580c}
-.badge-moderate{background:#d97706}
-.badge-minor{background:#2563eb}
-/* Element code */
-.el-code{font-family:"SF Mono",Menlo,Monaco,Consolas,monospace;font-size:10px;color:#475569;background:#c2d5e8;padding:2px 5px;border-radius:4px;display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
-/* Status */
-.status-open{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #fde68a;white-space:nowrap}
-/* Inspect link */
-.inspect-link{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:#1d4ed8;padding:3px 9px;border-radius:5px;border:1px solid #93c5fd;background:#dbeafe;white-space:nowrap}
-/* Footer */
-.report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #b8cfe4;font-size:10px;color:#94a3b8;text-align:center}
-@media print{
-  body{padding:16px 20px;background:#eef2f8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .page-block{break-inside:avoid}
-}
-`;
-
 export function generateDeveloperReport(scanData: ScanData) {
   const { scan, pages, results } = scanData;
 
@@ -209,107 +156,362 @@ export function generateDeveloperReport(scanData: ScanData) {
   results.forEach(r => { counts[r.impact as ImpactLevel]++; });
 
   const pagesWithIssues = pages.filter(p => p.violation_count > 0);
+  const domain = scan.url.replace(/https?:\/\//,"").replace(/\/.*$/,"");
+  const totalPages = pagesWithIssues.length;
 
-  const pageSections = pagesWithIssues.map(page => {
+  // Build all page blocks as JSON-serialisable data, then render via embedded JS
+  const pageData = pagesWithIssues.map(page => {
     const pageResults = results.filter(r => r.page_id === page.id);
-
     const rows = pageResults.map(r => {
       const lvl = (r.impact as ImpactLevel) || "moderate";
-      const m   = impactMeta[lvl];
       const el  = r.element
-        ? r.element.replace(/\s+/g," ").trim().slice(0, 60) + (r.element.length > 60 ? "…" : "")
-        : r.selector || "—";
-      const fix = suggestedFix(r);
-      const inspectUrl = `${page.url}#ada-selector=${encodeURIComponent(r.selector||r.element||"")}`;
+        ? r.element.replace(/\s+/g," ").trim()
+        : r.selector || "";
+      return {
+        title:  r.title,
+        impact: lvl,
+        el,
+        fix:    suggestedFix(r),
+        url:    `${page.url}#ada-selector=${encodeURIComponent(r.selector||r.element||"")}`,
+      };
+    });
+    return {
+      url:    page.url,
+      title:  page.title || page.url,
+      score:  page.score,
+      count:  page.violation_count,
+      rows,
+    };
+  });
 
-      return `<tr>
-        <td style="font-weight:600;color:#1e293b">${esc(r.title)}</td>
-        <td><span class="badge badge-${lvl}">${m.label}</span></td>
-        <td><span class="el-code" title="${esc(el)}">${esc(el)}</span></td>
-        <td style="color:#475569">${esc(fix)}</td>
-        <td><a href="${esc(inspectUrl)}" class="inspect-link">Inspect Issue ↗</a></td>
-        <td><span class="status-open">Open</span></td>
-      </tr>`;
-    }).join("");
+  const pageDataJson = JSON.stringify(pageData)
+    .replace(/</g,"\\u003c").replace(/>/g,"\\u003e").replace(/&/g,"\\u0026");
 
-    const scoreVal = page.score ?? null;
-    const scoreC   = scoreColor(scoreVal);
-
-    return `<div class="page-block">
-      <div class="page-heading">
-        <span class="page-name">${esc(page.title || page.url)}</span>
-        <span class="page-url">${esc(page.url)}</span>
-        <span class="page-score" style="color:${scoreC}">Score: ${scoreVal ?? "N/A"}</span>
-      </div>
-      <table class="issues-table">
-        <thead>
-          <tr>
-            <th style="width:22%">Issue</th>
-            <th style="width:10%">Severity</th>
-            <th style="width:20%">Affected Element</th>
-            <th style="width:26%">Suggested Fix</th>
-            <th style="width:13%">Inspect Issue</th>
-            <th style="width:9%">Status</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-  }).join("");
-
-  const domain = scan.url.replace(/https?:\/\//,"").replace(/\/.*$/,"");
+  const PAGES_PER_PAGE = 5;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Developer Report — ${esc(domain)}</title>
-<style>${DEV_CSS}</style>
+<style>
+:root{
+  --bg:#edf2f9;--surface:#ffffff;--surface2:#f1f6fc;--border:#d0dcea;
+  --blue:#1d4ed8;--blue-light:#dbeafe;--blue-mid:#bfdbfe;
+  --text:#1e293b;--muted:#64748b;--faint:#94a3b8;
+  --critical:#dc2626;--serious:#ea580c;--moderate:#d97706;--minor:#2563eb;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+     background:var(--bg);color:var(--text);font-size:13px;line-height:1.6;min-height:100vh}
+a{color:var(--blue);text-decoration:none}
+
+/* ── Top bar ── */
+.topbar{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);
+        padding:20px 36px;display:flex;align-items:center;justify-content:space-between;
+        box-shadow:0 4px 20px rgba(37,99,235,.25)}
+.topbar-left{display:flex;align-items:center;gap:14px}
+.logo{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.2);
+      backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;
+      font-size:20px;font-weight:900;color:#fff;border:1px solid rgba(255,255,255,.3)}
+.topbar h1{font-size:18px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.topbar .sub{font-size:11px;color:rgba(255,255,255,.65);margin-top:1px}
+.score-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+            border-radius:40px;padding:6px 18px;color:#fff;font-size:13px;font-weight:600;
+            display:flex;align-items:center;gap:8px;backdrop-filter:blur(4px)}
+.score-num{font-size:22px;font-weight:800}
+
+/* ── Wrapper ── */
+.wrap{max-width:1200px;margin:0 auto;padding:28px 36px 48px}
+
+/* ── Meta row ── */
+.meta-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+.meta-chip{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+           padding:8px 16px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.meta-chip strong{color:var(--text);font-weight:600}
+
+/* ── Section heading ── */
+.sec-head{font-size:16px;font-weight:700;color:var(--blue);
+          margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.sec-head::after{content:"";flex:1;height:2px;background:linear-gradient(90deg,var(--blue-mid),transparent)}
+
+/* ── Summary cards ── */
+.summary-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:30px}
+.s-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+        padding:14px 12px;text-align:center;position:relative;overflow:hidden;
+        transition:transform .15s,box-shadow .15s}
+.s-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.08)}
+.s-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
+.s-card.c-pages::before{background:var(--blue)}
+.s-card.c-issues::before{background:#7c3aed}
+.s-card.c-critical::before{background:var(--critical)}
+.s-card.c-serious::before{background:var(--serious)}
+.s-card.c-moderate::before{background:var(--moderate)}
+.s-card.c-minor::before{background:var(--minor)}
+.s-val{font-size:28px;font-weight:800;line-height:1;margin-bottom:4px}
+.s-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+
+/* ── Pages section ── */
+.pages-section{margin-bottom:0}
+
+/* ── Page block ── */
+.page-block{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+            margin-bottom:16px;overflow:hidden;
+            box-shadow:0 2px 8px rgba(0,0,0,.04);transition:box-shadow .2s}
+.page-block:hover{box-shadow:0 4px 16px rgba(0,0,0,.09)}
+
+.page-head{padding:13px 18px;background:linear-gradient(90deg,#f0f6ff 0%,#f8fbff 100%);
+           border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;flex-wrap:wrap}
+.page-num{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;
+          font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
+          flex-shrink:0;margin-right:12px}
+.page-info{flex:1;min-width:0}
+.page-url-link{font-size:12px;color:var(--muted);font-family:"SF Mono",Menlo,Monaco,monospace;
+               display:block;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+               transition:color .15s}
+.page-url-link:hover{color:var(--blue);text-decoration:underline}
+.page-title-link{font-size:13px;font-weight:700;color:var(--blue);display:block;
+                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .15s}
+.page-title-link:hover{opacity:.75;text-decoration:underline}
+.page-badges{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;padding-left:12px}
+.issues-count{font-size:12px;font-weight:700;color:#fff;background:var(--critical);
+              padding:3px 10px;border-radius:20px}
+.score-badge{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid}
+
+/* ── Issues table ── */
+.issues-wrap{overflow-x:auto}
+.issues-table{width:100%;border-collapse:collapse;min-width:700px}
+.issues-table thead th{padding:9px 14px;font-size:10px;font-weight:700;text-transform:uppercase;
+                        letter-spacing:.07em;color:var(--muted);background:var(--surface2);
+                        text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.issues-table tbody tr{transition:background .12s}
+.issues-table tbody tr:hover td{background:#f0f6ff}
+.issues-table tbody td{padding:10px 14px;font-size:12px;color:#334155;
+                        border-bottom:1px solid #f1f5f9;vertical-align:top}
+.issues-table tbody tr:last-child td{border-bottom:none}
+.issues-table tbody tr:nth-child(even) td{background:#fafcff}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;
+       color:#fff;white-space:nowrap;letter-spacing:.03em}
+.badge-critical{background:var(--critical)}
+.badge-serious{background:var(--serious)}
+.badge-moderate{background:var(--moderate)}
+.badge-minor{background:var(--minor)}
+
+/* ── Element code ── */
+.el-code{font-family:"SF Mono",Menlo,Monaco,Consolas,monospace;font-size:10px;color:#475569;
+         background:#e8f0fb;padding:3px 7px;border-radius:5px;display:block;
+         max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+         border:1px solid #ccdaf5;cursor:default}
+
+/* ── Inspect link ── */
+.inspect-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
+              color:var(--blue);padding:4px 10px;border-radius:6px;border:1px solid var(--blue-mid);
+              background:var(--blue-light);white-space:nowrap;transition:background .15s,transform .1s}
+.inspect-link:hover{background:#bfdbfe;transform:translateY(-1px)}
+.inspect-link svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;
+                  stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Status ── */
+.status-open{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;
+             font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #fde68a}
+
+/* ── Pagination ── */
+.pagination{display:flex;align-items:center;justify-content:space-between;
+            background:var(--surface);border:1px solid var(--border);border-radius:12px;
+            padding:14px 20px;margin-top:20px}
+.page-info-text{font-size:13px;color:var(--muted)}
+.page-info-text strong{color:var(--text)}
+.pag-btns{display:flex;gap:8px;align-items:center}
+.pag-btn{padding:7px 18px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+         border:1px solid var(--border);background:var(--surface);color:var(--text);
+         transition:all .15s;display:flex;align-items:center;gap:5px}
+.pag-btn:hover:not(:disabled){background:var(--blue);color:#fff;border-color:var(--blue)}
+.pag-btn:disabled{opacity:.4;cursor:not-allowed}
+.pag-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.pag-btn.primary:hover:not(:disabled){background:#1e40af}
+.pag-dots{display:flex;gap:6px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border);cursor:pointer;transition:background .15s}
+.dot.active{background:var(--blue)}
+
+/* ── Footer ── */
+.footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--border);
+        font-size:11px;color:var(--faint);text-align:center}
+</style>
 </head>
 <body>
-  <div class="report-header">
-    <div class="report-title">ADA Scanner - Developer Report</div>
-    <div class="report-meta">
-      <strong>Website:</strong> ${esc(domain)}<br>
-      <strong>Generated:</strong> ${fmtDate(new Date().toISOString())}<br>
-      <strong>Accessibility Score:</strong> ${scan.score ?? "N/A"}/100
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">A</div>
+    <div>
+      <div class="topbar h1" style="font-size:18px;font-weight:700;color:#fff">ADA Scanner — Developer Report</div>
+      <div class="sub">Technical accessibility audit with inspectable element references</div>
     </div>
   </div>
+  <div class="score-pill">
+    <span>Score</span>
+    <span class="score-num">${scan.score ?? "—"}</span>
+    <span style="opacity:.7">/100</span>
+  </div>
+</div>
 
-  <div class="summary-section">
-    <div class="section-heading">Summary</div>
-    <table class="summary-table">
-      <thead>
-        <tr>
-          <th>Pages</th>
-          <th>Issues</th>
-          <th>Critical</th>
-          <th>Serious</th>
-          <th>Moderate</th>
-          <th>Minor</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>${scan.pages_scanned}</td>
-          <td>${scan.total_violations}</td>
-          <td class="c-critical">${counts.critical}</td>
-          <td class="c-serious">${counts.serious}</td>
-          <td class="c-moderate">${counts.moderate}</td>
-          <td class="c-minor">${counts.minor}</td>
-        </tr>
-      </tbody>
-    </table>
+<div class="wrap">
+  <div class="meta-row">
+    <div class="meta-chip"><strong>Website:</strong> ${esc(domain)}</div>
+    <div class="meta-chip"><strong>Generated:</strong> ${fmtDate(new Date().toISOString())}</div>
+    <div class="meta-chip"><strong>Pages Scanned:</strong> ${scan.pages_scanned}</div>
+    <div class="meta-chip"><strong>Pages with Issues:</strong> ${totalPages}</div>
   </div>
 
-  <div class="pages-section">
-    <div class="section-heading">Page-wise Issues</div>
-    ${pageSections || "<p style='color:#64748b;padding:12px'>No violations detected.</p>"}
+  <div class="sec-head">Summary</div>
+  <div class="summary-grid">
+    <div class="s-card c-pages"><div class="s-val" style="color:var(--blue)">${scan.pages_scanned}</div><div class="s-lbl">Pages</div></div>
+    <div class="s-card c-issues"><div class="s-val" style="color:#7c3aed">${scan.total_violations}</div><div class="s-lbl">Issues</div></div>
+    <div class="s-card c-critical"><div class="s-val" style="color:var(--critical)">${counts.critical}</div><div class="s-lbl">Critical</div></div>
+    <div class="s-card c-serious"><div class="s-val" style="color:var(--serious)">${counts.serious}</div><div class="s-lbl">Serious</div></div>
+    <div class="s-card c-moderate"><div class="s-val" style="color:var(--moderate)">${counts.moderate}</div><div class="s-lbl">Moderate</div></div>
+    <div class="s-card c-minor"><div class="s-val" style="color:var(--minor)">${counts.minor}</div><div class="s-lbl">Minor</div></div>
   </div>
 
-  <div class="report-footer">
-    Generated by ADA Scanner — Developer Report — ${fmtDate(new Date().toISOString())}
+  <div class="sec-head">Page-wise Issues</div>
+  <div class="pages-section" id="pages-container"></div>
+
+  ${totalPages > PAGES_PER_PAGE ? `
+  <div class="pagination">
+    <div class="page-info-text" id="pag-info"></div>
+    <div class="pag-btns">
+      <button class="pag-btn" id="btn-prev" onclick="changePage(-1)">&#8592; Prev</button>
+      <div class="pag-dots" id="pag-dots"></div>
+      <button class="pag-btn primary" id="btn-next" onclick="changePage(1)">Next &#8594;</button>
+    </div>
+  </div>` : ""}
+
+  <div class="footer">
+    Generated by ADA Scanner &mdash; Developer Report &mdash; ${fmtDate(new Date().toISOString())}
   </div>
+</div>
+
+<script>
+(function(){
+  var DATA = ${pageDataJson};
+  var PER_PAGE = ${PAGES_PER_PAGE};
+  var total = DATA.length;
+  var totalPag = Math.ceil(total / PER_PAGE);
+  var cur = 0;
+
+  var COLORS = { critical:"#dc2626", serious:"#ea580c", moderate:"#d97706", minor:"#2563eb" };
+  var LABELS = { critical:"Critical", serious:"Serious", moderate:"Moderate", minor:"Minor" };
+
+  function scoreColor(s){
+    if(s===null||s===undefined) return "#64748b";
+    if(s>=80) return "#059669"; if(s>=50) return "#d97706"; return "#dc2626";
+  }
+
+  function esc(s){
+    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function inspectIcon(){
+    return '<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+  }
+
+  function renderPage(pg){
+    var start = pg * PER_PAGE;
+    var slice = DATA.slice(start, start + PER_PAGE);
+    var html = "";
+    slice.forEach(function(p, i){
+      var idx = start + i + 1;
+      var sc = p.score;
+      var scColor = scoreColor(sc);
+      var scTxt = sc !== null && sc !== undefined ? sc + "/100" : "N/A";
+      var scBorder = scColor;
+
+      var rowsHtml = "";
+      p.rows.forEach(function(r){
+        var lvl = r.impact;
+        var col = COLORS[lvl] || "#2563eb";
+        var lbl = LABELS[lvl] || lvl;
+        var el  = esc(r.el ? r.el.slice(0,80)+(r.el.length>80?"…":"") : "—");
+        rowsHtml +=
+          "<tr>" +
+          "<td style='font-weight:600;color:#1e293b'>" + esc(r.title) + "</td>" +
+          "<td><span class='badge badge-" + lvl + "'>" + lbl + "</span></td>" +
+          "<td><span class='el-code' title='" + esc(r.el) + "'>" + el + "</span></td>" +
+          "<td style='color:#475569'>" + esc(r.fix) + "</td>" +
+          "<td><a href='" + esc(r.url) + "' target='_blank' class='inspect-link'>" + inspectIcon() + " Inspect</a></td>" +
+          "<td><span class='status-open'>Open</span></td>" +
+          "</tr>";
+      });
+
+      html +=
+        "<div class='page-block'>" +
+          "<div class='page-head'>" +
+            "<div class='page-num'>" + idx + "</div>" +
+            "<div class='page-info'>" +
+              "<a class='page-url-link' href='" + esc(p.url) + "' target='_blank'>" + esc(p.url) + "</a>" +
+              "<a class='page-title-link' href='" + esc(p.url) + "' target='_blank'>" + esc(p.title) + "</a>" +
+            "</div>" +
+            "<div class='page-badges'>" +
+              "<span class='issues-count'>" + p.count + " issue" + (p.count!==1?"s":"") + "</span>" +
+              "<span class='score-badge' style='color:" + scColor + ";border-color:" + scBorder + ";background:" + scColor + "18'>" + scTxt + "</span>" +
+            "</div>" +
+          "</div>" +
+          "<div class='issues-wrap'>" +
+          "<table class='issues-table'><thead><tr>" +
+            "<th style='width:21%'>Issue</th>" +
+            "<th style='width:10%'>Severity</th>" +
+            "<th style='width:21%'>Affected Element</th>" +
+            "<th style='width:27%'>Suggested Fix</th>" +
+            "<th style='width:12%'>Inspect Issue</th>" +
+            "<th style='width:9%'>Status</th>" +
+          "</tr></thead><tbody>" + rowsHtml + "</tbody></table>" +
+          "</div>" +
+        "</div>";
+    });
+
+    document.getElementById("pages-container").innerHTML = html || "<p style='color:#64748b;padding:12px'>No violations detected.</p>";
+
+    var infoEl = document.getElementById("pag-info");
+    if(infoEl){
+      var from = start+1, to = Math.min(start+PER_PAGE, total);
+      infoEl.innerHTML = "Showing pages <strong>" + from + "–" + to + "</strong> of <strong>" + total + "</strong>";
+    }
+
+    var dotsEl = document.getElementById("pag-dots");
+    if(dotsEl){
+      var dotsHtml = "";
+      for(var d=0;d<totalPag;d++){
+        dotsHtml += "<div class='dot" + (d===pg?" active":"") + "' onclick='goPage("+d+")'></div>";
+      }
+      dotsEl.innerHTML = dotsHtml;
+    }
+
+    var prevBtn = document.getElementById("btn-prev");
+    var nextBtn = document.getElementById("btn-next");
+    if(prevBtn) prevBtn.disabled = pg===0;
+    if(nextBtn) nextBtn.disabled = pg===totalPag-1;
+  }
+
+  window.changePage = function(dir){
+    var next = cur + dir;
+    if(next<0||next>=totalPag) return;
+    cur = next;
+    renderPage(cur);
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
+
+  window.goPage = function(pg){
+    cur = pg;
+    renderPage(cur);
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
+
+  renderPage(0);
+})();
+</script>
 </body>
 </html>`;
 
