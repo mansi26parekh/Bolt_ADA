@@ -116,29 +116,6 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
     });
   };
 
-  const scoreColor = (score: number | null) => {
-    if (score === null) return "text-slate-500";
-    if (score >= 80) return "text-emerald-400";
-    if (score >= 50) return "text-amber-400";
-    return "text-red-400";
-  };
-
-  const scoreBg = (score: number | null) => {
-    if (score === null) return "bg-slate-800";
-    if (score >= 80) return "bg-emerald-500/10 border-emerald-500/20";
-    if (score >= 50) return "bg-amber-500/10 border-amber-500/20";
-    return "bg-red-500/10 border-red-500/20";
-  };
-
-  const scoreLabel = (score: number | null) => {
-    if (score === null) return "N/A";
-    if (score >= 90) return "Excellent";
-    if (score >= 80) return "Good";
-    if (score >= 60) return "Needs Work";
-    if (score >= 40) return "Poor";
-    return "Critical";
-  };
-
   const openInspect = (result: ScanResult, pageUrl: string) => {
     setInspectResult(result);
     setInspectPageUrl(pageUrl);
@@ -181,8 +158,9 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
         {/* ── Hero summary banner ── */}
         {(() => {
           const totalIssues = results.length;
-          const affectedPages = pages.filter((p) => p.violation_count > 0).length;
-          const score = scan.accessibility_score ?? null;
+          const totalPages = pages.length;
+          const passedPages = pages.filter((p) => p.violation_count === 0 && p.status === "completed").length;
+          const failedPages = totalPages - passedPages;
           const hasCritical = violationsByImpact.critical > 0;
           const hasSerious = violationsByImpact.serious > 0;
           const dominantLabel = hasCritical
@@ -219,19 +197,21 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                   <p className={`text-sm font-semibold mt-0.5 ${dominantColor}`}>
                     {totalIssues} Need Fixes{" "}
                     <span className="text-slate-400 font-normal text-xs">
-                      (across {affectedPages} page{affectedPages !== 1 ? "s" : ""})
+                      (across {failedPages} of {totalPages} page{totalPages !== 1 ? "s" : ""})
                     </span>
                   </p>
                 </div>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-xs text-slate-500 mb-0.5">Score</p>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-3xl font-bold ${scoreColor(score)}`}>
-                    {score !== null ? score : "—"}
-                  </span>
-                  <span className="text-sm text-slate-500">/100</span>
+                <p className="text-xs text-slate-500 mb-0.5">Pages</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold text-emerald-400">{passedPages}</span>
+                  <span className="text-sm text-slate-500">pass</span>
+                  <span className="text-slate-600 mx-0.5">/</span>
+                  <span className="text-2xl font-bold text-red-400">{failedPages}</span>
+                  <span className="text-sm text-slate-500">fail</span>
                 </div>
+                <p className="text-[10px] text-slate-500 mt-0.5">of {totalPages} total</p>
               </div>
             </div>
           );
