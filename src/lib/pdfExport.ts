@@ -155,36 +155,47 @@ export function generateDeveloperReport(scanData: ScanData) {
   const counts: Record<ImpactLevel, number> = { critical:0, serious:0, moderate:0, minor:0 };
   results.forEach(r => { counts[r.impact as ImpactLevel]++; });
 
-  const pagesWithIssues = pages.filter(p => p.violation_count > 0);
+  // Derive pages from actual results (robust against stale violation_count)
+  const pageMap = new Map<string, { url: string; title: string; score: number | null; count: number; rows: any[] }>();
+  const pageById = new Map(pages.map(p => [p.id, p]));
+  results.forEach(r => {
+    let entry = pageMap.get(r.page_id);
+    if (!entry) {
+      const pg = pageById.get(r.page_id);
+      entry = {
+        url:   pg?.url || "",
+        title: pg?.title || pg?.url || r.page_id,
+        score: pg?.score ?? null,
+        count: 0,
+        rows: [],
+      };
+      pageMap.set(r.page_id, entry);
+    }
+    const lvl = (r.impact as ImpactLevel) || "moderate";
+    const el = r.element ? r.element.replace(/\s+/g," ").trim() : r.selector || "";
+    entry.rows.push({
+      title:    r.title,
+      impact:   lvl,
+      el,
+      selector: r.selector || "",
+      desc:     r.description || "",
+      fix:      suggestedFix(r),
+      pageUrl:  entry.url,
+    });
+    entry.count++;
+  });
+  const pagesWithIssues = Array.from(pageMap.values()).filter(p => p.url);
   const domain = scan.url.replace(/https?:\/\//,"").replace(/\/.*$/,"");
   const totalPages = pagesWithIssues.length;
 
   // Build all page blocks as JSON-serialisable data, then render via embedded JS
-  const pageData = pagesWithIssues.map(page => {
-    const pageResults = results.filter(r => r.page_id === page.id);
-    const rows = pageResults.map(r => {
-      const lvl = (r.impact as ImpactLevel) || "moderate";
-      const el  = r.element
-        ? r.element.replace(/\s+/g," ").trim()
-        : r.selector || "";
-      return {
-        title:    r.title,
-        impact:   lvl,
-        el,
-        selector: r.selector || "",
-        desc:     r.description || "",
-        fix:      suggestedFix(r),
-        pageUrl:  page.url,
-      };
-    });
-    return {
-      url:    page.url,
-      title:  page.title || page.url,
-      score:  page.score,
-      count:  page.violation_count,
-      rows,
-    };
-  });
+  const pageData = pagesWithIssues.map(page => ({
+    url:    page.url,
+    title:  page.title,
+    score:  page.score,
+    count:  page.count,
+    rows:   page.rows,
+  }));
 
   const pageDataJson = JSON.stringify(pageData)
     .replace(/</g,"\\u003c").replace(/>/g,"\\u003e").replace(/&/g,"\\u0026");
