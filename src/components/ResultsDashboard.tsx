@@ -18,6 +18,7 @@ import {
   Download,
   FileCode,
   Wrench,
+  ExternalLink,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
@@ -30,6 +31,39 @@ interface ResultsDashboardProps {
 
 type ImpactLevel = "critical" | "serious" | "moderate" | "minor";
 type Tab = "pages";
+
+const FIX_RECOMMENDATIONS: Record<string, string> = {
+  "image-alt":
+    "Add an alt attribute describing the image's purpose. Use concise, meaningful text for informative images, or alt=\"\" for purely decorative ones. Avoid phrases like \"image of\" — screen readers already announce that.",
+  "image-alt-empty-link":
+    "Provide alt text on the linked image, or add accessible text to the link (aria-label, aria-labelledby, title, or visible text). The alt should describe the link's destination, not the image itself.",
+  "input-image-alt":
+    "Add an alt attribute to the <input type=\"image\"> that describes the button's action (e.g. alt=\"Search\"), not the image's appearance.",
+  "html-lang-valid":
+    "Add a lang attribute to the <html> element with the page's primary language code (e.g. <html lang=\"en\">). This ensures screen readers use the correct pronunciation engine.",
+  "document-title":
+    "Add a unique, descriptive <title> element inside <head> that identifies the page's content or function. Titles should be concise and distinct across pages.",
+  "label":
+    "Associate a <label> with the control using for=\"id\", wrap the control in <label>, or provide aria-label / aria-labelledby / title. The label must describe what input is expected.",
+  "label-empty":
+    "Add visible text inside the <label> element that describes the associated control, or remove the empty label and provide an accessible name via aria-label or aria-labelledby.",
+  "multiple-labels":
+    "Keep only one <label> associated with each control. Multiple labels create ambiguous announcements — pick the clearest one and remove the rest.",
+  "button-name":
+    "Provide accessible text for the button: visible text content, aria-label, aria-labelledby, title, an image with alt, or an SVG with <title> or aria-label.",
+  "link-name":
+    "Add text that describes the link's destination: visible text, aria-label, aria-labelledby, title, an inner image with alt, or an SVG with <title>/aria-label. Avoid \"click here\".",
+  "empty-heading":
+    "Add meaningful text to the heading, or remove it if it's not a real section. Empty headings create dead navigation landmarks for screen reader users.",
+  "th-empty":
+    "Add text to the <th> describing the column or row, or use scope=\"col\"/scope=\"row\" with an abbr attribute. Avoid empty headers — they break table navigation.",
+  "aria-reference-broken":
+    "Ensure every id referenced by aria-labelledby / aria-describedby exists on the page and is unique. Fix the typo, add the missing element, or remove the invalid attribute.",
+  "skip-link-broken":
+    "Add a target element (e.g. <main id=\"main-content\">) that matches the skip link's href. The skip link must move focus to real content, not a missing anchor.",
+  "duplicate-id":
+    "Make each id unique on the page. Duplicate ids break in-page anchors, label associations, and ARIA references. Use classes for styling instead of shared ids.",
+};
 
 const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: string; bg: string; badge: string; border: string; label: string }> = {
   critical: { icon: AlertOctagon, color: "text-red-400", bg: "bg-red-500/10", badge: "bg-red-500/20 text-red-300 border border-red-500/30", border: "border-l-2 border-l-red-500/60", label: "Critical" },
@@ -298,16 +332,34 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                           Inspect
                                         </button>
                                         {result.help_url && (
-                                          <a
-                                            href={result.help_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
-                                            title="Recommended fix guidance"
-                                          >
-                                            <Wrench className="w-3 h-3" />
-                                            Fix
-                                          </a>
+                                          <div className="relative group/fix">
+                                            <button
+                                              type="button"
+                                              className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
+                                            >
+                                              <Wrench className="w-3 h-3" />
+                                              Fix
+                                            </button>
+                                            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
+                                              <div className="flex items-center gap-1.5 mb-1.5">
+                                                <Wrench className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                <span className="text-[11px] font-semibold text-emerald-300">Recommended fix</span>
+                                              </div>
+                                              <p className="text-[11px] text-slate-300 leading-relaxed">
+                                                {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
+                                              </p>
+                                              <a
+                                                href={result.help_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="mt-2 inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300"
+                                              >
+                                                Full reference
+                                                <ExternalLink className="w-2.5 h-2.5" />
+                                              </a>
+                                              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-700" />
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
                                     </div>
