@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
-import { generateDeveloperReport, generateClientReport } from "../lib/pdfExport";
+import { generateDeveloperReport } from "../lib/pdfExport";
 
 interface ResultsDashboardProps {
   scanData: ScanData;
@@ -28,7 +28,7 @@ interface ResultsDashboardProps {
 }
 
 type ImpactLevel = "critical" | "serious" | "moderate" | "minor";
-type Tab = "overview" | "pages" | "violations";
+type Tab = "pages";
 
 const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: string; bg: string; badge: string; border: string; label: string }> = {
   critical: { icon: AlertOctagon, color: "text-red-400", bg: "bg-red-500/10", badge: "bg-red-500/20 text-red-300 border border-red-500/30", border: "border-l-2 border-l-red-500/60", label: "Critical" },
@@ -38,7 +38,7 @@ const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: stri
 };
 
 export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>("pages");
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
   const [expandedViolations, setExpandedViolations] = useState<Set<string>>(new Set());
@@ -143,147 +143,8 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Score Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-8">
-          <div className={`w-24 h-24 rounded-2xl border flex flex-col items-center justify-center ${scoreBg(scan.score)}`}>
-            <span className={`text-3xl font-bold ${scoreColor(scan.score)}`}>
-              {scan.score ?? "--"}
-            </span>
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Score</span>
-          </div>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold mb-1">
-              {scoreLabel(scan.score)} Accessibility
-            </h1>
-            <p className="text-sm text-slate-400 mb-3">
-              {scan.total_violations} violations found across {scan.pages_scanned} pages
-            </p>
-            <div className="flex items-center gap-4">
-              {(["critical", "serious", "moderate", "minor"] as ImpactLevel[]).map((impact) => {
-                const config = impactConfig[impact];
-                const count = violationsByImpact[impact];
-                if (count === 0) return null;
-                return (
-                  <div key={impact} className="flex items-center gap-1.5">
-                    <config.icon className={`w-3.5 h-3.5 ${config.color}`} />
-                    <span className="text-xs text-slate-400">{count} {config.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Impact Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          {(["critical", "serious", "moderate", "minor"] as ImpactLevel[]).map((impact) => {
-            const config = impactConfig[impact];
-            const count = violationsByImpact[impact];
-            return (
-              <button
-                key={impact}
-                onClick={() => {
-                  setImpactFilter(impactFilter === impact ? "all" : impact);
-                  setActiveTab("violations");
-                }}
-                className={`p-4 rounded-xl border transition-all ${
-                  impactFilter === impact
-                    ? `${config.bg} border-current ${config.color}`
-                    : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
-                }`}
-              >
-                <config.icon className={`w-5 h-5 mb-2 ${config.color}`} />
-                <p className="text-2xl font-bold">{count}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{config.label}</p>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-1 border-b border-slate-800 mb-6">
-          {([
-            { id: "overview" as Tab, label: "Overview", icon: BarChart3 },
-            { id: "pages" as Tab, label: "Pages", icon: FileText },
-            { id: "violations" as Tab, label: "Violations", icon: AlertTriangle },
-          ]).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                activeTab === tab.id
-                  ? "border-emerald-400 text-emerald-400"
-                  : "border-transparent text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-              {tab.id === "violations" && (
-                <span className="text-xs bg-slate-800 px-1.5 py-0.5 rounded-full">{results.length}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Overview Tab */}
-        {activeTab === "overview" && (
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Violations by Category */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-sm font-semibold mb-4">Violations by WCAG Category</h3>
-              <div className="space-y-3">
-                {violationsByCategory.map(([category, count]) => (
-                  <div key={category} className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-slate-300">{category}</span>
-                        <span className="text-xs text-slate-500">{count}</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500/60 rounded-full"
-                          style={{ width: `${(count / results.length) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Page Scores */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-sm font-semibold mb-4">Page Scores</h3>
-              <div className="space-y-2">
-                {pages
-                  .filter((p) => p.status === "completed")
-                  .sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
-                  .map((page) => (
-                    <button
-                      key={page.id}
-                      onClick={() => {
-                        setSelectedPage(page.id);
-                        setActiveTab("violations");
-                      }}
-                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition-colors text-left"
-                    >
-                      <span className={`text-sm font-mono font-bold w-8 text-right ${scoreColor(page.score)}`}>
-                        {page.score ?? "--"}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-300 truncate">{page.title || page.url}</p>
-                      </div>
-                      <span className="text-xs text-slate-600">{page.violation_count} issues</span>
-                    </button>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Pages Tab */}
-        {activeTab === "pages" && (
-          <div className="space-y-4">
+        <div className="space-y-4">
           <div className="flex items-center justify-end">
             <div className="relative">
               <button
@@ -306,17 +167,6 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                       <div>
                         <div className="font-medium">Developer Report</div>
                         <div className="text-xs text-slate-500">Technical details with inspect links</div>
-                      </div>
-                    </button>
-                    <div className="border-t border-slate-700" />
-                    <button
-                      onClick={() => { setExportOpen(false); generateClientReport(scanData); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-slate-200 hover:bg-slate-700/80 transition-colors"
-                    >
-                      <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                      <div>
-                        <div className="font-medium">Client Report</div>
-                        <div className="text-xs text-slate-500">Executive summary</div>
                       </div>
                     </button>
                   </div>
@@ -349,10 +199,6 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                         </p>
                         <p className="text-xs text-slate-500 truncate mt-0.5">{page.url}</p>
                         <div className="flex items-center gap-4 mt-2">
-                          <span className={`text-xs font-mono font-medium px-2 py-0.5 rounded-md ${scoreBg(page.score)} ${scoreColor(page.score)}`}>
-                            Score: {page.score ?? "N/A"}
-                          </span>
-                          <span className="text-xs text-slate-500">Depth: {page.depth}</span>
                           <span className="text-xs text-red-400/80">{page.violation_count} violations</span>
                           {page.violation_count === 0 ? (
                             <span className="text-xs text-emerald-400/80">All checks passed</span>
@@ -459,17 +305,6 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                                     {result.selector && (
                                       <p className="text-[10px] text-slate-500 font-mono">{result.selector}</p>
                                     )}
-                                    {result.help_url && (
-                                      <a
-                                        href={result.help_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
-                                      >
-                                        Learn how to fix
-                                        <ExternalLink className="w-2.5 h-2.5" />
-                                      </a>
-                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -489,116 +324,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
               );
             })}
           </div>
-          </div>
-        )}
-
-        {/* Violations Tab */}
-        {activeTab === "violations" && (
-          <div>
-            {/* Filters */}
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              {selectedPage && (
-                <button
-                  onClick={() => setSelectedPage(null)}
-                  className="flex items-center gap-1.5 text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
-                >
-                  {pages.find((p) => p.id === selectedPage)?.title || "Page"}
-                  <XCircle className="w-3 h-3" />
-                </button>
-              )}
-              {impactFilter !== "all" && (
-                <button
-                  onClick={() => setImpactFilter("all")}
-                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                    impactConfig[impactFilter].bg
-                  } ${impactConfig[impactFilter].color} border-current`}
-                >
-                  {impactConfig[impactFilter].label}
-                  <XCircle className="w-3 h-3" />
-                </button>
-              )}
-              <span className="text-xs text-slate-500 ml-auto">
-                {filteredResults.length} result{filteredResults.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-
-            {/* Violation List */}
-            <div className="space-y-2">
-              {filteredResults.length === 0 && (
-                <div className="text-center py-12">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
-                  <p className="text-sm text-slate-400">No violations match your filters</p>
-                </div>
-              )}
-              {filteredResults.map((result) => {
-                const config = impactConfig[result.impact as ImpactLevel] ?? impactConfig.moderate;
-                const isExpanded = expandedViolations.has(result.id);
-                return (
-                  <div
-                    key={result.id}
-                    className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden"
-                  >
-                    <button
-                      onClick={() => toggleViolation(result.id)}
-                      className="w-full p-4 flex items-start gap-3 text-left hover:bg-slate-800/30 transition-colors"
-                    >
-                      <config.icon className={`w-4 h-4 ${config.color} shrink-0 mt-0.5`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-200">{result.title}</p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.badge}`}>
-                            {config.label}
-                          </span>
-                          <span className="text-[10px] text-slate-600">{result.category}</span>
-                        </div>
-                      </div>
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
-                      )}
-                    </button>
-                    {isExpanded && (
-                      <div className="px-4 pb-4 pl-11 space-y-3">
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Description</p>
-                          <p className="text-xs text-slate-300">{result.description}</p>
-                        </div>
-                        {result.element && (
-                          <div>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Element</p>
-                            <code className="text-xs text-slate-300 bg-slate-800/50 px-3 py-1.5 rounded-lg block break-all">
-                              {result.element}
-                            </code>
-                          </div>
-                        )}
-                        {result.selector && (
-                          <div>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Selector</p>
-                            <code className="text-xs text-emerald-400/80 bg-slate-800/50 px-3 py-1.5 rounded-lg block">
-                              {result.selector}
-                            </code>
-                          </div>
-                        )}
-                        {result.help_url && (
-                          <a
-                            href={result.help_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-                          >
-                            Learn how to fix this
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
     </>
