@@ -311,7 +311,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
             <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5">
               <button
                 onClick={() => setPageFilter("all")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${
                   pageFilter === "all"
                     ? "bg-slate-700 text-white shadow-sm"
                     : "text-slate-400 hover:text-slate-200"
@@ -321,7 +321,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
               </button>
               <button
                 onClick={() => setPageFilter("affected")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${
                   pageFilter === "affected"
                     ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-sm"
                     : "text-slate-400 hover:text-slate-200"
