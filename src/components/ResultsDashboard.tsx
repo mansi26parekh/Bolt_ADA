@@ -17,6 +17,8 @@ import {
   ScanSearch,
   Download,
   Wrench,
+  Share2,
+  Check,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
@@ -138,6 +140,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
   const [pageFilter, setPageFilter] = useState<"all" | "affected">("all");
   const [expandedViolations, setExpandedViolations] = useState<Set<string>>(new Set());
+  const [shareCopied, setShareCopied] = useState(false);
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
   const [inspectResult, setInspectResult] = useState<ScanResult | null>(null);
   const [inspectPageUrl, setInspectPageUrl] = useState<string | null>(null);
@@ -184,6 +187,17 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   };
 
   const closeInspect = () => { setInspectResult(null); setInspectPageUrl(null); };
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?scan=${scan.id}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      window.prompt("Copy this link to share the report:", shareUrl);
+    }
+  };
 
   return (
     <>
@@ -330,13 +344,31 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                 Affected Pages
               </button>
             </div>
-            <button
-              onClick={() => generateDeveloperReport(scanData)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-            >
-              <Download className="w-4 h-4" />
-              Download Report
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                {shareCopied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Link Copied
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4" />
+                    Share Link
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => generateDeveloperReport(scanData)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download Report
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             {pages.filter((page) => pageFilter === "affected" ? page.violation_count > 0 : true).map((page) => {

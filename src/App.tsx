@@ -12,7 +12,10 @@ import {
   updateLastScan,
   deleteProject,
 } from "./lib/projectService";
-import type { Project } from "./lib/types";
+import type { Project, ScanData } from "./lib/types";
+
+const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 function App() {
   const { view, scanData, scanId, error, startScan, goToResults, resetScan } = useScan();
@@ -22,6 +25,10 @@ function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [landingInitialUrl, setLandingInitialUrl] = useState<string>("");
   const [pendingDeleteProject, setPendingDeleteProject] = useState<Project | null>(null);
+  const [sharedScanData, setSharedScanData] = useState<ScanData | null>(null);
+
+  const sharedScanId = new URLSearchParams(window.location.search).get("scan");
+  const isSharedView = Boolean(sharedScanId);
 
   // Load projects on mount
   useEffect(() => {
@@ -29,6 +36,23 @@ function App() {
       .then(setProjects)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!sharedScanId) return;
+    let cancelled = false;
+    fetch(`${API_URL}/${sharedScanId}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": ANON_KEY,
+        "Authorization": `Bearer ${ANON_KEY}`,
+      },
+    })
+      .then((res) => res.json())
+      .then((data: ScanData) => { if (!cancelled) setSharedScanData(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedScanId]);
 
   // When a scan starts (scanId appears), record it on the active project
   useEffect(() => {
@@ -108,7 +132,7 @@ function App() {
     }
   }, [pendingDeleteProject, activeProjectId, resetScan]);
 
-  const showSidebar = view !== "landing";
+  const showSidebar = view !== "landing" && !isSharedView;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
@@ -123,7 +147,15 @@ function App() {
       )}
 
       <div className="flex-1 overflow-auto">
-        {view === "scanning" && scanId ? (
+        {isSharedView ? (
+          sharedScanData ? (
+            <ResultsDashboard scanData={sharedScanData} onReset={() => {}} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-400">
+              <p className="text-sm">Loading shared report…</p>
+            </div>
+          )
+        ) : view === "scanning" && scanId ? (
           <ScanningView scanData={scanData} scanId={scanId} />
         ) : view === "results" && scanData ? (
           <ResultsDashboard scanData={scanData} onReset={handleNewScan} />
