@@ -136,6 +136,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>("pages");
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
+  const [pageFilter, setPageFilter] = useState<"all" | "affected">("all");
   const [expandedViolations, setExpandedViolations] = useState<Set<string>>(new Set());
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
   const [inspectResult, setInspectResult] = useState<ScanResult | null>(null);
@@ -306,7 +307,29 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
 
         {/* ── Pages list ── */}
         <div className="space-y-4">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+              <button
+                onClick={() => setPageFilter("all")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  pageFilter === "all"
+                    ? "bg-slate-700 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                All Pages
+              </button>
+              <button
+                onClick={() => setPageFilter("affected")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  pageFilter === "affected"
+                    ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Affected Pages
+              </button>
+            </div>
             <button
               onClick={() => generateDeveloperReport(scanData)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
@@ -316,7 +339,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
             </button>
           </div>
           <div className="space-y-2">
-            {pages.map((page) => {
+            {pages.filter((page) => pageFilter === "affected" ? page.violation_count > 0 : true).map((page) => {
               const pageViolations = results.filter((r) => r.page_id === page.id);
               const isExpanded = expandedPage === page.id;
               return (
