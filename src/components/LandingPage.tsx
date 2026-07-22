@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import {
   Shield,
   Globe,
-  Layers,
   ArrowRight,
   CheckCircle2,
   Search,
@@ -29,8 +28,7 @@ export function LandingPage({
   onSelectProject,
 }: LandingPageProps) {
   const [url, setUrl] = useState(initialUrl);
-  const [maxDepth, setMaxDepth] = useState(3);
-  const [isExpanded, setIsExpanded] = useState(false);
+
   const [retestChoice, setRetestChoice] = useState<"yes" | "no" | "">("");
   const [showAllProjects, setShowAllProjects] = useState(false);
 
@@ -47,7 +45,7 @@ export function LandingPage({
     if (!/^https?:\/\//i.test(finalUrl)) {
       finalUrl = "https://" + finalUrl;
     }
-    onStartScan(finalUrl, maxDepth);
+    onStartScan(finalUrl, 3);
   };
 
   const handleRetestChange = (choice: "yes" | "no") => {
@@ -234,35 +232,6 @@ export function LandingPage({
               </div>
             )}
 
-            {/* Advanced Options Toggle */}
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="text-sm text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1.5"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                {isExpanded ? "Hide" : "Show"} advanced options
-              </button>
-            </div>
-
-            {/* Advanced Options Panel */}
-            {isExpanded && (
-              <div className="mt-4 bg-slate-900/60 border border-slate-800 rounded-xl p-5 animate-in fade-in duration-200">
-                <label className="block text-xs font-medium text-slate-400 mb-2">Crawl Depth</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    value={maxDepth}
-                    onChange={(e) => setMaxDepth(parseInt(e.target.value))}
-                    className="flex-1 accent-emerald-500"
-                  />
-                  <span className="text-sm font-mono text-emerald-400 w-6 text-right">{maxDepth}</span>
-                </div>
-                <p className="text-xs text-slate-600 mt-1">How deep to follow links from the start page</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
