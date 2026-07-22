@@ -422,6 +422,9 @@ a{color:var(--blue);text-decoration:none}
              background:var(--blue-light);border-radius:8px;border:1px solid var(--blue-mid);
              line-height:1.5;display:none}
 .modal-hint:not(:empty){display:block}
+.modal-hint kbd{display:inline-block;font-family:monospace;font-size:10px;padding:1px 5px;
+  background:#1e293b;color:#fff;border-radius:4px;border:1px solid #334155;margin:0 1px}
+.modal-hint a:hover{text-decoration:underline}
 
 /* ── Status ── */
 .status-open{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;
@@ -582,22 +585,15 @@ a{color:var(--blue);text-decoration:none}
       if(!currentIssue)return;
       var sel=currentIssue.selector||currentIssue.el||'';
       var cmd=buildCmd(sel);
+      clip(cmd);
       var url=currentIssue.pageUrl;
-      var w;
-      try{w=window.open(url,'_blank');}catch(ex){w=null;}
-      if(!w){clip(cmd);if(hintEl)hintEl.textContent='Popup blocked. Command copied \u2014 paste in DevTools console (F12) on the page.';return;}
-      var done=false;
-      setTimeout(function(){
-        if(done)return;done=true;
-        try{
-          var el=w.document.querySelector(sel);
-          if(el){el.style.outline='4px solid #dc2626';el.style.outlineOffset='2px';el.scrollIntoView({behavior:'smooth',block:'center'});}
-          if(hintEl)hintEl.textContent='Element highlighted on the page.';
-        }catch(ex){
-          clip(cmd);
-          if(hintEl)hintEl.textContent='Cross-origin page. Command copied \u2014 press F12 on the opened page, paste in Console, hit Enter.';
-        }
-      },2500);
+      var w=null;
+      try{w=window.open(url,'_blank');}catch(ex){}
+      if(w){
+        hintEl.innerHTML='<strong>Command copied to clipboard!</strong><br>The page opened in a new tab. On that page:<br>1. Press <kbd>F12</kbd> (or right-click \u2192 Inspect)<br>2. Click the <strong>Console</strong> tab<br>3. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste<br>4. Press <kbd>Enter</kbd> \u2014 the element will be highlighted in red.';
+      }else{
+        hintEl.innerHTML='<strong>Command copied to clipboard!</strong><br>Popup was blocked, so open the page manually:<br>1. Open: <a href="'+esc(url)+'" target="_blank" style="color:#1e40af;text-decoration:underline">'+esc(url)+'</a><br>2. Press <kbd>F12</kbd> \u2192 <strong>Console</strong> tab<br>3. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste<br>4. Press <kbd>Enter</kbd> \u2014 the element will be highlighted in red.';
+      }
       return;
     }
   });
