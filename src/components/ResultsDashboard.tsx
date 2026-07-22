@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Shield,
   ArrowLeft,
@@ -145,6 +145,18 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
   const [inspectResult, setInspectResult] = useState<ScanResult | null>(null);
   const [inspectPageUrl, setInspectPageUrl] = useState<string | null>(null);
   const [hoverInspect, setHoverInspect] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(e.target as Node)) {
+        setShareOpen(false);
+      }
+    };
+    if (shareOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [shareOpen]);
 
 
   const { scan, pages, results } = scanData;
@@ -344,30 +356,38 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
                 Affected Pages
               </button>
             </div>
-            <div className="flex items-center gap-2">
+            <div ref={shareRef} className="relative">
               <button
-                onClick={handleShare}
+                onClick={() => setShareOpen((prev) => !prev)}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
               >
-                {shareCopied ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Link Copied
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="w-4 h-4" />
-                    Share Link
-                  </>
-                )}
+                <Share2 className="w-4 h-4" />
+                Share Report
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${shareOpen ? "rotate-180" : ""}`} />
               </button>
-              <button
-                onClick={() => generateDeveloperReport(scanData)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-              >
-                <Download className="w-4 h-4" />
-                Download Report
-              </button>
+              {shareOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-600 rounded-xl shadow-xl overflow-hidden z-20">
+                  <button
+                    onClick={() => { generateDeveloperReport(scanData); setShareOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors text-left"
+                  >
+                    <Download className="w-4 h-4 text-blue-400 shrink-0" />
+                    Export Report
+                  </button>
+                  <div className="border-t border-slate-600/50" />
+                  <button
+                    onClick={() => { handleShare(); setShareOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors text-left"
+                  >
+                    {shareCopied ? (
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : (
+                      <Share2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    )}
+                    {shareCopied ? "Link Copied!" : "Accessible via Link"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <div className="space-y-2">
