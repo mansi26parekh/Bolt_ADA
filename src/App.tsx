@@ -164,6 +164,8 @@ function App() {
             onStartScan={handleStartScan}
             error={error}
             initialUrl={landingInitialUrl}
+            projects={projects}
+            onSelectProject={handleSelectProject}
           />
         )}
       </div>

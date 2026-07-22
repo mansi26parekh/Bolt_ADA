@@ -1,16 +1,44 @@
-import { useState } from "react";
-import { Shield, Globe, Layers, ArrowRight, CheckCircle2, Search, Zap, BarChart3 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import {
+  Shield,
+  Globe,
+  Layers,
+  ArrowRight,
+  CheckCircle2,
+  Search,
+  Zap,
+  BarChart3,
+  History,
+  ChevronRight,
+} from "lucide-react";
+import type { Project } from "../lib/types";
 
 interface LandingPageProps {
   onStartScan: (url: string, maxDepth: number) => void;
   error: string | null;
   initialUrl?: string;
+  projects?: Project[];
+  onSelectProject?: (project: Project) => void;
 }
 
-export function LandingPage({ onStartScan, error, initialUrl = "" }: LandingPageProps) {
+export function LandingPage({
+  onStartScan,
+  error,
+  initialUrl = "",
+  projects = [],
+  onSelectProject,
+}: LandingPageProps) {
   const [url, setUrl] = useState(initialUrl);
   const [maxDepth, setMaxDepth] = useState(3);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [retestChoice, setRetestChoice] = useState<"yes" | "no" | "">("");
+  const [showAllProjects, setShowAllProjects] = useState(false);
+
+  const urlInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialUrl) setUrl(initialUrl);
+  }, [initialUrl]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +49,22 @@ export function LandingPage({ onStartScan, error, initialUrl = "" }: LandingPage
     }
     onStartScan(finalUrl, maxDepth);
   };
+
+  const handleRetestChange = (choice: "yes" | "no") => {
+    setRetestChoice(choice);
+    if (choice === "no") {
+      setShowAllProjects(false);
+      setTimeout(() => urlInputRef.current?.focus(), 50);
+    }
+  };
+
+  const recentProjects = [...projects]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5);
+
+  const displayedProjects = showAllProjects
+    ? [...projects].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    : recentProjects;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -66,11 +110,16 @@ export function LandingPage({ onStartScan, error, initialUrl = "" }: LandingPage
           {/* Scan Form */}
           <div className="max-w-2xl mx-auto">
             <form onSubmit={handleSubmit} className="relative">
-              <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-800 rounded-2xl p-2 shadow-2xl shadow-black/20">
+              <div
+                className={`bg-slate-900/80 backdrop-blur-sm border rounded-2xl p-2 shadow-2xl shadow-black/20 transition-all duration-300 ${
+                  retestChoice === "no" ? "border-emerald-500/60 ring-2 ring-emerald-500/20" : "border-slate-800"
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-3 px-4">
                     <Globe className="w-5 h-5 text-slate-500 shrink-0" />
                     <input
+                      ref={urlInputRef}
                       type="text"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
@@ -95,6 +144,95 @@ export function LandingPage({ onStartScan, error, initialUrl = "" }: LandingPage
                 </div>
               )}
             </form>
+
+            {/* Re-test Radio */}
+            <div className="mt-4 flex items-center justify-center gap-6">
+              <span className="text-sm text-slate-400">Do you want to re-test?</span>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="radio"
+                  name="retest"
+                  value="yes"
+                  checked={retestChoice === "yes"}
+                  onChange={() => handleRetestChange("yes")}
+                  className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                />
+                <span className={`text-sm transition-colors ${retestChoice === "yes" ? "text-emerald-400 font-medium" : "text-slate-400 group-hover:text-slate-200"}`}>
+                  Yes
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="radio"
+                  name="retest"
+                  value="no"
+                  checked={retestChoice === "no"}
+                  onChange={() => handleRetestChange("no")}
+                  className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                />
+                <span className={`text-sm transition-colors ${retestChoice === "no" ? "text-emerald-400 font-medium" : "text-slate-400 group-hover:text-slate-200"}`}>
+                  No
+                </span>
+              </label>
+            </div>
+
+            {/* Recent Projects Card (shown when "Yes" is selected) */}
+            {retestChoice === "yes" && recentProjects.length > 0 && (
+              <div className="mt-5 bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-800">
+                  <History className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-sm font-semibold text-white">
+                    {showAllProjects ? "All Scanned Projects" : "Recent Scanned Projects"}
+                  </h3>
+                  <span className="text-xs text-slate-500 ml-auto">{displayedProjects.length} project{displayedProjects.length !== 1 ? "s" : ""}</span>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {displayedProjects.map((project) => (
+                    <button
+                      key={project.id}
+                      onClick={() => onSelectProject?.(project)}
+                      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-800/50 transition-colors text-left group border-b border-slate-800/50 last:border-b-0"
+                    >
+                      <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-emerald-500/10 transition-colors">
+                        <Globe className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition-colors" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{project.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{project.url}</p>
+                      </div>
+                      {project.last_scan_id && (
+                        <span className="text-xs text-emerald-400/70 shrink-0">Scanned</span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" />
+                    </button>
+                  ))}
+                </div>
+                {!showAllProjects && projects.length > 5 && (
+                  <button
+                    onClick={() => setShowAllProjects(true)}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-800/30 hover:bg-slate-800/60 text-emerald-400 text-sm font-medium transition-colors border-t border-slate-800"
+                  >
+                    View All
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {showAllProjects && (
+                  <button
+                    onClick={() => setShowAllProjects(false)}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-800/30 hover:bg-slate-800/60 text-slate-400 text-sm font-medium transition-colors border-t border-slate-800"
+                  >
+                    Show Less
+                  </button>
+                )}
+              </div>
+            )}
+
+            {retestChoice === "yes" && recentProjects.length === 0 && (
+              <div className="mt-5 bg-slate-900/60 border border-slate-800 rounded-xl px-5 py-8 text-center animate-in fade-in duration-200">
+                <History className="w-6 h-6 text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No previous scans yet. Enter a URL above to start your first scan.</p>
+              </div>
+            )}
 
             {/* Advanced Options Toggle */}
             <div className="mt-4 text-center">
