@@ -176,39 +176,39 @@ export function LandingPage({
 
             {/* Recent Projects Card (shown when "Yes" is selected) */}
             {retestChoice === "yes" && recentProjects.length > 0 && (
-              <div className="mt-5 bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-800">
+              <div className="mt-5 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-600">
                   <History className="w-4 h-4 text-emerald-400" />
                   <h3 className="text-sm font-semibold text-white">
                     {showAllProjects ? "All Scanned Projects" : "Recent Scanned Projects"}
                   </h3>
-                  <span className="text-xs text-slate-500 ml-auto">{displayedProjects.length} project{displayedProjects.length !== 1 ? "s" : ""}</span>
+                  <span className="text-xs text-slate-300 ml-auto">{displayedProjects.length} project{displayedProjects.length !== 1 ? "s" : ""}</span>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
                   {displayedProjects.map((project) => (
                     <button
                       key={project.id}
                       onClick={() => onSelectProject?.(project)}
-                      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-slate-800/50 transition-colors text-left group border-b border-slate-800/50 last:border-b-0"
+                      className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-700/60 transition-colors text-left group border-b border-slate-600/50 last:border-b-0"
                     >
-                      <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-emerald-500/10 transition-colors">
-                        <Globe className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition-colors" />
+                      <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-emerald-500/20 transition-colors">
+                        <Globe className="w-4 h-4 text-slate-300 group-hover:text-emerald-400 transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">{project.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{project.url}</p>
+                        <p className="text-xs text-slate-400 truncate">{project.url}</p>
                       </div>
                       {project.last_scan_id && (
-                        <span className="text-xs text-emerald-400/70 shrink-0">Scanned</span>
+                        <span className="text-xs text-emerald-400 font-medium shrink-0">Scanned</span>
                       )}
-                      <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-200 transition-colors shrink-0" />
                     </button>
                   ))}
                 </div>
                 {!showAllProjects && projects.length > 5 && (
                   <button
                     onClick={() => setShowAllProjects(true)}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-800/30 hover:bg-slate-800/60 text-emerald-400 text-sm font-medium transition-colors border-t border-slate-800"
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-700/40 hover:bg-slate-700/80 text-emerald-400 text-sm font-medium transition-colors border-t border-slate-600"
                   >
                     View All
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -217,7 +217,7 @@ export function LandingPage({
                 {showAllProjects && (
                   <button
                     onClick={() => setShowAllProjects(false)}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-800/30 hover:bg-slate-800/60 text-slate-400 text-sm font-medium transition-colors border-t border-slate-800"
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-slate-700/40 hover:bg-slate-700/80 text-slate-300 text-sm font-medium transition-colors border-t border-slate-600"
                   >
                     Show Less
                   </button>
@@ -226,9 +226,9 @@ export function LandingPage({
             )}
 
             {retestChoice === "yes" && recentProjects.length === 0 && (
-              <div className="mt-5 bg-slate-900/60 border border-slate-800 rounded-xl px-5 py-8 text-center animate-in fade-in duration-200">
-                <History className="w-6 h-6 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">No previous scans yet. Enter a URL above to start your first scan.</p>
+              <div className="mt-5 bg-slate-800 border border-slate-600 rounded-xl px-5 py-8 text-center animate-in fade-in duration-200">
+                <History className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-400">No previous scans yet. Enter a URL above to start your first scan.</p>
               </div>
             )}
 
