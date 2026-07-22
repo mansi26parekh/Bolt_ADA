@@ -89,6 +89,7 @@ function HighlightedHtml({ html }: { html: string }) {
 interface ResultsDashboardProps {
   scanData: ScanData;
   onReset: () => void;
+  onToast?: (message: string) => void;
 }
 
 type ImpactLevel = "critical" | "serious" | "moderate" | "minor";
@@ -134,7 +135,7 @@ const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: stri
   minor: { icon: Info, color: "text-blue-400", bg: "bg-blue-500/10", badge: "bg-blue-500/20 text-blue-300 border border-blue-500/30", border: "border-l-2 border-l-blue-500/60", label: "Minor" },
 };
 
-export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
+export function ResultsDashboard({ scanData, onReset, onToast }: ResultsDashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>("pages");
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
@@ -205,6 +206,7 @@ export function ResultsDashboard({ scanData, onReset }: ResultsDashboardProps) {
     try {
       await navigator.clipboard.writeText(shareUrl);
       setShareCopied(true);
+      onToast?.("Link has been copied");
       setTimeout(() => setShareCopied(false), 2000);
     } catch {
       window.prompt("Copy this link to share the report:", shareUrl);

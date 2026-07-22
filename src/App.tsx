@@ -149,7 +149,7 @@ function App() {
       <div className="flex-1 overflow-auto">
         {isSharedView ? (
           sharedScanData ? (
-            <ResultsDashboard scanData={sharedScanData} onReset={() => {}} />
+            <ResultsDashboard scanData={sharedScanData} onReset={() => {}} onToast={setToastMessage} />
           ) : (
             <div className="flex items-center justify-center h-full text-slate-400">
               <p className="text-sm">Loading shared report…</p>
@@ -158,7 +158,7 @@ function App() {
         ) : view === "scanning" && scanId ? (
           <ScanningView scanData={scanData} scanId={scanId} />
         ) : view === "results" && scanData ? (
-          <ResultsDashboard scanData={scanData} onReset={handleNewScan} />
+          <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} />
         ) : (
           <LandingPage
             onStartScan={handleStartScan}
