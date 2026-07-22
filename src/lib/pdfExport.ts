@@ -226,7 +226,7 @@ export function generateDeveloperReport(scanData: ScanData) {
         <td><span class="badge badge-${lvl}">${lbl}</span></td>
         <td><span class="el-code" title="${esc(r.el)}">${esc(elShort)}</span></td>
         <td style="color:#475569">${esc(r.fix)}</td>
-        <td><button class="inspect-btn" onclick="openInspect(${pi},${ri})"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg> Inspect</button></td>
+        <td><a class="inspect-btn" href="${esc(page.url)}" target="_blank" rel="noopener" data-p="${pi}" data-r="${ri}"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg> Inspect</a></td>
         <td><span class="status-open">Open</span></td>
       </tr>`;
     }).join("");
@@ -377,7 +377,7 @@ a{color:var(--blue);text-decoration:none}
 .inspect-btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
             color:var(--blue);padding:4px 10px;border-radius:6px;border:1px solid var(--blue-mid);
             background:var(--blue-light);white-space:nowrap;cursor:pointer;
-            transition:background .15s,transform .1s;font-family:inherit}
+            transition:background .15s,transform .1s;font-family:inherit;text-decoration:none}
 .inspect-btn:hover{background:#bfdbfe;transform:translateY(-1px)}
 .inspect-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;
                 stroke-linecap:round;stroke-linejoin:round}
@@ -418,6 +418,10 @@ a{color:var(--blue);text-decoration:none}
 .modal-btn:hover{background:var(--surface2)}
 .modal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
 .modal-btn.primary:hover{background:#1e40af}
+.modal-hint{font-size:11px;color:var(--blue);margin-top:12px;padding:8px 12px;
+             background:var(--blue-light);border-radius:8px;border:1px solid var(--blue-mid);
+             line-height:1.5;display:none}
+.modal-hint:not(:empty){display:block}
 
 /* ── Status ── */
 .status-open{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;
@@ -489,11 +493,11 @@ a{color:var(--blue);text-decoration:none}
   </div>
 </div>
 
-<div class="modal-overlay" id="inspect-modal" onclick="if(event.target===this)closeModal()">
+<div class="modal-overlay" id="inspect-modal">
   <div class="modal">
     <div class="modal-head">
       <h3 id="modal-title">Inspect Issue</h3>
-      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <button class="modal-close" id="modal-close">&times;</button>
     </div>
     <div class="modal-body">
       <div class="modal-label">Issue</div>
@@ -501,13 +505,14 @@ a{color:var(--blue);text-decoration:none}
       <div class="modal-label">Description</div>
       <div class="modal-desc" id="modal-desc"></div>
       <div class="modal-label">CSS Selector</div>
-      <div class="code-block" id="modal-selector"><button class="copy-btn" onclick="copyText(this,'modal-selector')">Copy</button></div>
+      <div class="code-block" id="modal-selector"></div>
       <div class="modal-label">DevTools Console Command</div>
-      <div class="code-block" id="modal-cmd"><button class="copy-btn" onclick="copyText(this,'modal-cmd')">Copy</button></div>
+      <div class="code-block" id="modal-cmd"></div>
       <div class="modal-actions">
-        <button class="modal-btn" onclick="openPage()">Open Page &rarr;</button>
-        <button class="modal-btn primary" onclick="copyAndOpen()">Copy Command &amp; Open Page</button>
+        <button class="modal-btn" id="btn-open-page">Open Page &rarr;</button>
+        <button class="modal-btn primary" id="btn-highlight">Highlight on Page</button>
       </div>
+      <div class="modal-hint" id="modal-hint"></div>
     </div>
   </div>
 </div>
@@ -516,69 +521,90 @@ a{color:var(--blue);text-decoration:none}
 (function(){
   var DATA = ${pageDataJson};
   var currentIssue = null;
+  var modal = document.getElementById('inspect-modal');
+  if(!modal) return;
+  var hintEl = document.getElementById('modal-hint');
 
   function esc(s){
     return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
-  function buildConsoleCmd(sel){
+  function buildCmd(sel){
     if(!sel) return "document.body";
     var s = sel.replace(/'/g,"\\'");
     return "var el=document.querySelector('"+s+"');if(el){el.style.outline='4px solid #dc2626';el.style.outlineOffset='2px';el.scrollIntoView({behavior:'smooth',block:'center'});console.log('ADA Scanner: element highlighted',el);}else{console.warn('ADA Scanner: element not found for selector: "+s+"');}";
   }
 
-  window.openInspect = function(pageIdx, rowIdx){
-    var p = DATA[pageIdx];
-    if(!p) return;
-    var r = p.rows[rowIdx];
-    if(!r) return;
-    currentIssue = r;
-    document.getElementById('modal-title').textContent = r.title || 'Inspect Issue';
-    document.getElementById('modal-issue').textContent = r.title || '—';
-    document.getElementById('modal-desc').textContent = r.desc || 'No description available.';
-    var selEl = document.getElementById('modal-selector');
-    selEl.innerHTML = '<button class="copy-btn" onclick="copyText(this,\'modal-selector\')">Copy</button>' + esc(r.selector || r.el || 'No selector available');
-    var cmdEl = document.getElementById('modal-cmd');
-    var cmd = buildConsoleCmd(r.selector || r.el || '');
-    cmdEl.innerHTML = '<button class="copy-btn" onclick="copyText(this,\'modal-cmd\')">Copy</button>' + esc(cmd);
-    document.getElementById('inspect-modal').classList.add('show');
-    document.body.style.overflow = 'hidden';
-  };
+  function clip(text){
+    var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);
+    ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);
+  }
 
-  window.closeModal = function(){
-    document.getElementById('inspect-modal').classList.remove('show');
-    document.body.style.overflow = '';
-  };
+  function openInspect(pi,ri){
+    var p=DATA[pi];if(!p)return;
+    var r=p.rows[ri];if(!r)return;
+    currentIssue=r;
+    document.getElementById('modal-title').textContent=r.title||'Inspect Issue';
+    document.getElementById('modal-issue').textContent=r.title||'\u2014';
+    document.getElementById('modal-desc').textContent=r.desc||'No description available.';
+    var sel=r.selector||r.el||'No selector available';
+    document.getElementById('modal-selector').innerHTML='<button class="copy-btn" data-copy="modal-selector">Copy</button>'+esc(sel);
+    var cmd=buildCmd(r.selector||r.el||'');
+    document.getElementById('modal-cmd').innerHTML='<button class="copy-btn" data-copy="modal-cmd">Copy</button>'+esc(cmd);
+    if(hintEl) hintEl.textContent='';
+    modal.classList.add('show');
+    document.body.style.overflow='hidden';
+  }
 
-  window.copyText = function(btn, elId){
-    var el = document.getElementById(elId);
-    var text = el.textContent.replace(/^Copy/, '').trim();
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    try{ document.execCommand('copy'); }catch(e){}
-    document.body.removeChild(ta);
-    btn.textContent = 'Copied!';
-    btn.classList.add('copied');
-    setTimeout(function(){ btn.textContent='Copy'; btn.classList.remove('copied'); },1500);
-  };
+  function closeModal(){
+    modal.classList.remove('show');
+    document.body.style.overflow='';
+  }
 
-  window.openPage = function(){
-    if(currentIssue && currentIssue.pageUrl) window.open(currentIssue.pageUrl, '_blank');
-  };
+  document.addEventListener('click',function(e){
+    var ib=e.target.closest('.inspect-btn');
+    if(ib&&ib.dataset.p!==undefined){
+      e.preventDefault();openInspect(+ib.dataset.p,+ib.dataset.r);return;
+    }
+    var cb=e.target.closest('[data-copy]');
+    if(cb){
+      var el=document.getElementById(cb.dataset.copy);
+      clip(el.textContent.replace(/^Copy/,'').trim());
+      cb.textContent='Copied!';cb.classList.add('copied');
+      setTimeout(function(){cb.textContent='Copy';cb.classList.remove('copied');},1500);return;
+    }
+    if(e.target.id==='modal-close'||e.target===modal){closeModal();return;}
+    if(e.target.closest('#btn-open-page')){
+      if(currentIssue&&currentIssue.pageUrl) window.open(currentIssue.pageUrl,'_blank');return;
+    }
+    var hl=e.target.closest('#btn-highlight');
+    if(hl){
+      if(!currentIssue)return;
+      var sel=currentIssue.selector||currentIssue.el||'';
+      var cmd=buildCmd(sel);
+      var url=currentIssue.pageUrl;
+      var w;
+      try{w=window.open(url,'_blank');}catch(ex){w=null;}
+      if(!w){clip(cmd);if(hintEl)hintEl.textContent='Popup blocked. Command copied \u2014 paste in DevTools console (F12) on the page.';return;}
+      var done=false;
+      setTimeout(function(){
+        if(done)return;done=true;
+        try{
+          var el=w.document.querySelector(sel);
+          if(el){el.style.outline='4px solid #dc2626';el.style.outlineOffset='2px';el.scrollIntoView({behavior:'smooth',block:'center'});}
+          if(hintEl)hintEl.textContent='Element highlighted on the page.';
+        }catch(ex){
+          clip(cmd);
+          if(hintEl)hintEl.textContent='Cross-origin page. Command copied \u2014 press F12 on the opened page, paste in Console, hit Enter.';
+        }
+      },2500);
+      return;
+    }
+  });
 
-  window.copyAndOpen = function(){
-    var cmdEl = document.getElementById('modal-cmd');
-    var cmd = cmdEl.textContent.replace(/^Copy/, '').trim();
-    var ta = document.createElement('textarea');
-    ta.value = cmd;
-    document.body.appendChild(ta);
-    ta.select();
-    try{ document.execCommand('copy'); }catch(e){}
-    document.body.removeChild(ta);
-    window.open(currentIssue.pageUrl, '_blank');
-  };
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&modal.classList.contains('show'))closeModal();
+  });
 })();
 </script>
 </body>
