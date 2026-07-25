@@ -3,6 +3,7 @@ import { useScan } from "./hooks/useScan";
 import { LandingPage } from "./components/LandingPage";
 import { ScanningView } from "./components/ScanningView";
 import { ResultsDashboard } from "./components/ResultsDashboard";
+import { RescanOverlay } from "./components/RescanOverlay";
 import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -158,13 +159,16 @@ function App() {
           )
         ) : view === "scanning" && scanId ? (
           isRescanning ? (
-            <ResultsDashboard
-              scanData={previousScanData || scanData}
-              onReset={handleNewScan}
-              onToast={setToastMessage}
-              onRescan={() => setPendingRescan(true)}
-              isRescanning
-            />
+            <>
+              <ResultsDashboard
+                scanData={previousScanData || scanData}
+                onReset={handleNewScan}
+                onToast={setToastMessage}
+                onRescan={() => setPendingRescan(true)}
+                isRescanning
+              />
+              <RescanOverlay scanData={scanData} scanId={scanId} />
+            </>
           ) : (
             <ScanningView scanData={scanData} scanId={scanId} />
           )
