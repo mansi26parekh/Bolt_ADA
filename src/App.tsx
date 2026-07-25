@@ -18,7 +18,7 @@ const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 function App() {
-  const { view, scanData, scanId, error, startScan, goToResults, resetScan } = useScan();
+  const { view, scanData, scanId, error, isRescanning, previousScanData, startScan, rescan, goToResults, resetScan } = useScan();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -26,6 +26,7 @@ function App() {
   const [landingInitialUrl, setLandingInitialUrl] = useState<string>("");
   const [pendingDeleteProject, setPendingDeleteProject] = useState<Project | null>(null);
   const [sharedScanData, setSharedScanData] = useState<ScanData | null>(null);
+  const [pendingRescan, setPendingRescan] = useState(false);
 
   const sharedScanId = new URLSearchParams(window.location.search).get("scan");
   const isSharedView = Boolean(sharedScanId);
@@ -156,9 +157,19 @@ function App() {
             </div>
           )
         ) : view === "scanning" && scanId ? (
-          <ScanningView scanData={scanData} scanId={scanId} />
+          isRescanning ? (
+            <ResultsDashboard
+              scanData={previousScanData || scanData}
+              onReset={handleNewScan}
+              onToast={setToastMessage}
+              onRescan={() => setPendingRescan(true)}
+              isRescanning
+            />
+          ) : (
+            <ScanningView scanData={scanData} scanId={scanId} />
+          )
         ) : view === "results" && scanData ? (
-          <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} />
+          <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} onRescan={() => setPendingRescan(true)} isRescanning={false} />
         ) : (
           <LandingPage
             onStartScan={handleStartScan}
@@ -181,6 +192,19 @@ function App() {
           confirmLabel="Delete Project"
           onConfirm={confirmDeleteProject}
           onCancel={() => setPendingDeleteProject(null)}
+        />
+      )}
+
+      {pendingRescan && (
+        <ConfirmDialog
+          title="Re-scan website?"
+          message="Do you want to run a new accessibility scan?"
+          confirmLabel="Start Re-scan"
+          onConfirm={() => {
+            setPendingRescan(false);
+            rescan();
+          }}
+          onCancel={() => setPendingRescan(false)}
         />
       )}
     </div>

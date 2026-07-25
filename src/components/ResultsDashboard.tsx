@@ -19,6 +19,8 @@ import {
   Wrench,
   Share2,
   Check,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
@@ -90,6 +92,8 @@ interface ResultsDashboardProps {
   scanData: ScanData;
   onReset: () => void;
   onToast?: (message: string) => void;
+  onRescan?: () => void;
+  isRescanning?: boolean;
 }
 
 type ImpactLevel = "critical" | "serious" | "moderate" | "minor";
@@ -135,7 +139,7 @@ const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: stri
   minor: { icon: Info, color: "text-blue-400", bg: "bg-blue-500/10", badge: "bg-blue-500/20 text-blue-300 border border-blue-500/30", border: "border-l-2 border-l-blue-500/60", label: "Minor" },
 };
 
-export function ResultsDashboard({ scanData, onReset, onToast }: ResultsDashboardProps) {
+export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isRescanning }: ResultsDashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>("pages");
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
@@ -358,7 +362,25 @@ export function ResultsDashboard({ scanData, onReset, onToast }: ResultsDashboar
                 Affected Pages
               </button>
             </div>
-            <div ref={shareRef} className="relative">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onRescan}
+                disabled={isRescanning}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+              >
+                {isRescanning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Scanning website...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    Re-scan
+                  </>
+                )}
+              </button>
+              <div ref={shareRef} className="relative">
               <button
                 onClick={() => setShareOpen((prev) => !prev)}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
@@ -390,6 +412,7 @@ export function ResultsDashboard({ scanData, onReset, onToast }: ResultsDashboar
                   </button>
                 </div>
               )}
+            </div>
             </div>
           </div>
           <div className="space-y-2">

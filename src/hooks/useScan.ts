@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { ScanData, View } from "../lib/types";
 
 const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
@@ -9,10 +9,16 @@ export function useScan() {
   const [scanData, setScanData] = useState<ScanData | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isRescanning, setIsRescanning] = useState(false);
+  const [previousScanData, setPreviousScanData] = useState<ScanData | null>(null);
+
+  // Remember the parameters of the most recent scan so a re-scan can reuse them.
+  const lastScanParams = useRef<{ url: string; maxDepth: number } | null>(null);
 
   const startScan = useCallback(async (url: string, maxDepth: number) => {
     setError(null);
     setScanData(null);
+    lastScanParams.current = { url, maxDepth };
 
     try {
       const response = await fetch(API_URL, {
@@ -55,6 +61,7 @@ export function useScan() {
 
       if (data.scan.status === "completed" || data.scan.status === "failed") {
         setView("results");
+        setIsRescanning(false);
       }
     } catch {
       // Silently retry on next poll
@@ -73,6 +80,16 @@ export function useScan() {
     return () => clearInterval(interval);
   }, [scanId, view, fetchScanData]);
 
+  // Run a re-scan using the previous scan's URL and depth, preserving the
+  // current report for comparison/history while the new scan runs.
+  const rescan = useCallback(async () => {
+    const params = lastScanParams.current;
+    if (!params || isRescanning) return;
+    setPreviousScanData(scanData);
+    setIsRescanning(true);
+    await startScan(params.url, params.maxDepth);
+  }, [startScan, scanData, isRescanning]);
+
   const goToResults = useCallback((id: string) => {
     setScanId(id);
     fetchScanData(id);
@@ -83,6 +100,8 @@ export function useScan() {
     setScanData(null);
     setScanId(null);
     setError(null);
+    setIsRescanning(false);
+    setPreviousScanData(null);
   }, []);
 
   return {
@@ -90,7 +109,10 @@ export function useScan() {
     scanData,
     scanId,
     error,
+    isRescanning,
+    previousScanData,
     startScan,
+    rescan,
     goToResults,
     resetScan,
     setView,
