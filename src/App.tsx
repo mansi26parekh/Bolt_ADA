@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useScan } from "./hooks/useScan";
 import { LandingPage } from "./components/LandingPage";
 import { ScanningView } from "./components/ScanningView";
 import { ResultsDashboard } from "./components/ResultsDashboard";
 import { RescanOverlay } from "./components/RescanOverlay";
+import { CelebrationModal } from "./components/CelebrationModal";
 import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -28,6 +29,8 @@ function App() {
   const [pendingDeleteProject, setPendingDeleteProject] = useState<Project | null>(null);
   const [sharedScanData, setSharedScanData] = useState<ScanData | null>(null);
   const [pendingRescan, setPendingRescan] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const celebratedScanId = useRef<string | null>(null);
 
   const sharedScanId = new URLSearchParams(window.location.search).get("scan");
   const isSharedView = Boolean(sharedScanId);
@@ -134,6 +137,24 @@ function App() {
     }
   }, [pendingDeleteProject, activeProjectId, resetScan]);
 
+  // Show the celebration modal when a scan completes with zero violations.
+  useEffect(() => {
+    if (
+      scanData &&
+      scanData.scan.status === "completed" &&
+      scanData.results.length === 0 &&
+      scanData.scan.id !== celebratedScanId.current
+    ) {
+      celebratedScanId.current = scanData.scan.id;
+      setShowCelebration(true);
+    }
+  }, [scanData]);
+
+  const closeCelebration = useCallback(() => {
+    setShowCelebration(false);
+    handleNewScan();
+  }, [handleNewScan]);
+
   const showSidebar = view !== "landing" && !isSharedView;
 
   return (
@@ -197,6 +218,10 @@ function App() {
           onConfirm={confirmDeleteProject}
           onCancel={() => setPendingDeleteProject(null)}
         />
+      )}
+
+      {showCelebration && (
+        <CelebrationModal onClose={closeCelebration} />
       )}
 
       {pendingRescan && (
