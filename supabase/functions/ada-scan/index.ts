@@ -425,6 +425,32 @@ function analyzeAccessibility(
   let aim: RegExpExecArray | null;
   while ((aim = allIdRe.exec(cleanHtml)) !== null) allIds.add(aim[1]);
 
+  // Pre-compute ID → text-content map (for aria-labelledby validation in label checks)
+  const VOID_TAGS_ID = new Set(["img","input","br","hr","meta","link","area","base","col","embed","source","track","wbr","param"]);
+  const idTextMap = new Map<string, string>();
+  const idElemRe = /<(\w+)\b[^>]*\bid\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let iem: RegExpExecArray | null;
+  while ((iem = idElemRe.exec(cleanHtml)) !== null) {
+    const tagName = iem[1].toLowerCase();
+    const id = iem[2];
+    if (idTextMap.has(id)) continue;
+    if (VOID_TAGS_ID.has(tagName)) {
+      const altM = /\balt\s*=\s*["']([^"']*)["']/i.exec(iem[0]);
+      const valM = /\bvalue\s*=\s*["']([^"']*)["']/i.exec(iem[0]);
+      idTextMap.set(id, decodeEntities((altM?.[1] || valM?.[1] || "").trim()));
+    } else {
+      const afterIdx = iem.index + iem[0].length;
+      const closeRe = new RegExp(`</${iem[1]}\\s*>`, "i");
+      const closeMatch = cleanHtml.slice(afterIdx).search(closeRe);
+      if (closeMatch >= 0) {
+        const inner = cleanHtml.slice(afterIdx, afterIdx + closeMatch);
+        idTextMap.set(id, decodeEntities(inner.replace(/<[^>]*>/g, "").trim()));
+      } else {
+        idTextMap.set(id, "");
+      }
+    }
+  }
+
   // Pre-compute implicit label positions (inputs inside <label>)
   const implicitLabeledPositions = new Set<number>();
   const labelBlockRe = /<label\b[^>]*>[\s\S]*?<\/label>/gi;
@@ -449,10 +475,20 @@ function analyzeAccessibility(
   let match: RegExpExecArray | null;
 
   function controlHasLabel(tag: string, idx: number): boolean {
+    // 1. Wrapped <label> (implicit association)
     if (implicitLabeledPositions.has(idx)) return true;
+    // 2. Non-empty aria-label
     if (/\baria-label\s*=\s*["'][^"']+["']/i.test(tag)) return true;
-    if (/\baria-labelledby\s*=\s*["'][^"']+["']/i.test(tag)) return true;
-    if (/\btitle\s*=\s*["'][^"']+["']/i.test(tag)) return true;
+    // 3. Valid aria-labelledby — at least one referenced ID must exist with non-empty text
+    const albMatch = /\baria-labelledby\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (albMatch) {
+      const refIds = albMatch[1].trim().split(/\s+/);
+      if (refIds.some((refId) => {
+        const text = idTextMap.get(refId);
+        return text !== undefined && text.length > 0;
+      })) return true;
+    }
+    // 4. Associated <label for="id">
     const idm = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
     return !!(idm && labelForIds.has(idm[1]));
   }
@@ -543,7 +579,19 @@ function analyzeAccessibility(
       }
       continue;
     }
-    if (["hidden", "submit", "reset", "button"].includes(inputType)) continue;
+    if (inputType === "hidden" || inputType === "submit" || inputType === "reset") continue;
+    if (inputType === "button") {
+      // type="button" has no default value — needs an explicit non-empty value
+      // or another valid accessible name (label, aria-label, aria-labelledby)
+      if (/\bvalue\s*=\s*["'][^"']+["']/i.test(tag) || controlHasLabel(tag, match.index)) {
+        passCount++;
+      } else {
+        violations.push(v("label", "serious", "WCAG 1.3.1",
+          "Button input (type=\"button\") does not have an accessible name. Provide a non-empty value attribute, an associated label, aria-label, or aria-labelledby.",
+          "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 2000), buildSelector(tag)));
+      }
+      continue;
+    }
     if (controlHasLabel(tag, match.index)) {
       passCount++;
     } else {
