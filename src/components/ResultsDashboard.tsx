@@ -112,6 +112,10 @@ const FIX_RECOMMENDATIONS: Record<string, string> = {
     "Add a unique, descriptive <title> element inside <head> that identifies the page's content or function. Titles should be concise and distinct across pages.",
   "label":
     "Associate a <label> with the control using for=\"id\", wrap the control in <label>, or provide aria-label / aria-labelledby / title. The label must describe what input is expected.",
+  "label-title":
+    "Replace the title-only label with a proper <label> (for/id or wrapping), aria-label, or aria-labelledby. The title attribute is an unreliable accessible name.",
+  "select-missing-label":
+    "Associate a <label> with the <select> using for/id, wrap it in a <label>, or provide aria-label / aria-labelledby. The dropdown must announce its purpose to screen reader users.",
   "label-empty":
     "Add visible text inside the <label> element that describes the associated control, or remove the empty label and provide an accessible name via aria-label or aria-labelledby.",
   "multiple-labels":

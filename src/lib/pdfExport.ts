@@ -132,6 +132,8 @@ const RULE_FIXES: Record<string, string> = {
   "td-headers-attr": "Ensure all td headers attributes reference existing th ids",
   "th-has-data-cells": "Ensure each <th> has associated data cells",
   "select-name": "Add aria-label or <label> to <select> element",
+  "select-missing-label": "Add aria-label or <label> to <select> element",
+  "label-title": "Replace title-only label with a proper <label>, aria-label, or aria-labelledby",
   "input-image-alt": "Add alt attribute to <input type=\"image\">",
   "object-alt": "Add body text or title attribute to <object> element",
   "video-caption": "Add captions track to <video> element",

@@ -474,12 +474,16 @@ function analyzeAccessibility(
 
   let match: RegExpExecArray | null;
 
+  // WAVE label_missing: a form control has a valid accessible name if ANY of:
+  //   1. Wrapped <label> (implicit association)
+  //   2. Non-empty aria-label
+  //   3. aria-labelledby referencing at least one existing ID with non-empty text
+  //   4. Associated <label for="id">
+  //   5. Non-empty title (WAVE treats title as sufficient to avoid label_missing,
+  //      but reports a separate label_title alert — see labelTitleOnly check below)
   function controlHasLabel(tag: string, idx: number): boolean {
-    // 1. Wrapped <label> (implicit association)
     if (implicitLabeledPositions.has(idx)) return true;
-    // 2. Non-empty aria-label
     if (/\baria-label\s*=\s*["'][^"']+["']/i.test(tag)) return true;
-    // 3. Valid aria-labelledby — at least one referenced ID must exist with non-empty text
     const albMatch = /\baria-labelledby\s*=\s*["']([^"']+)["']/i.exec(tag);
     if (albMatch) {
       const refIds = albMatch[1].trim().split(/\s+/);
@@ -488,9 +492,29 @@ function analyzeAccessibility(
         return text !== undefined && text.length > 0;
       })) return true;
     }
-    // 4. Associated <label for="id">
     const idm = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
-    return !!(idm && labelForIds.has(idm[1]));
+    if (idm && labelForIds.has(idm[1])) return true;
+    if (/\btitle\s*=\s*["'][^"']+["']/i.test(tag)) return true;
+    return false;
+  }
+
+  // WAVE label_title alert: returns true when title is the ONLY accessible name method
+  // (no label, no aria-label, no valid aria-labelledby) — title alone is suboptimal.
+  function labelTitleOnly(tag: string, idx: number): boolean {
+    if (!/\btitle\s*=\s*["'][^"']+["']/i.test(tag)) return false;
+    if (implicitLabeledPositions.has(idx)) return false;
+    if (/\baria-label\s*=\s*["'][^"']+["']/i.test(tag)) return false;
+    const albMatch = /\baria-labelledby\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (albMatch) {
+      const refIds = albMatch[1].trim().split(/\s+/);
+      if (refIds.some((refId) => {
+        const text = idTextMap.get(refId);
+        return text !== undefined && text.length > 0;
+      })) return false;
+    }
+    const idm = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (idm && labelForIds.has(idm[1])) return false;
+    return true;
   }
 
   // ── 1. Images: missing alt ──
@@ -581,19 +605,24 @@ function analyzeAccessibility(
     }
     if (inputType === "hidden" || inputType === "submit" || inputType === "reset") continue;
     if (inputType === "button") {
-      // type="button" has no default value — needs an explicit non-empty value
-      // or another valid accessible name (label, aria-label, aria-labelledby)
+      // WAVE: type="button" without value/label → button_empty (not label_missing)
       if (/\bvalue\s*=\s*["'][^"']+["']/i.test(tag) || controlHasLabel(tag, match.index)) {
         passCount++;
       } else {
-        violations.push(v("label", "serious", "WCAG 1.3.1",
+        violations.push(v("button-name", "critical", "WCAG 4.1.2",
           "Button input (type=\"button\") does not have an accessible name. Provide a non-empty value attribute, an associated label, aria-label, or aria-labelledby.",
-          "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 2000), buildSelector(tag)));
+          "https://wave.webaim.org/api/references#e_button_empty", truncate(tag, 2000), buildSelector(tag)));
       }
       continue;
     }
     if (controlHasLabel(tag, match.index)) {
       passCount++;
+      // WAVE label_title alert: title is the ONLY accessible name method
+      if (labelTitleOnly(tag, match.index)) {
+        violations.push(v("label-title", "moderate", "WCAG 1.3.1",
+          "Form control is labeled only with a title attribute. While screen readers may read the title as a fallback, a proper <label>, aria-label, or aria-labelledby is recommended.",
+          "https://wave.webaim.org/api/references#a_label_title", truncate(tag, 2000), buildSelector(tag)));
+      }
     } else {
       violations.push(v("label", "serious", "WCAG 1.3.1",
         "Form input does not have an associated label. Users relying on screen readers or voice control cannot determine what information to enter.",
@@ -601,14 +630,22 @@ function analyzeAccessibility(
     }
   }
 
+  // WAVE: select_missing_label is an ALERT (not error) — same label logic as inputs
   const selectRe = /<select\b[^>]*>/gi;
   while ((match = selectRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
-    if (!controlHasLabel(tag, match.index)) {
-      violations.push(v("label", "serious", "WCAG 1.3.1",
+    if (controlHasLabel(tag, match.index)) {
+      passCount++;
+      if (labelTitleOnly(tag, match.index)) {
+        violations.push(v("label-title", "moderate", "WCAG 1.3.1",
+          "Select element is labeled only with a title attribute. A proper <label>, aria-label, or aria-labelledby is recommended.",
+          "https://wave.webaim.org/api/references#a_label_title", truncate(tag, 2000), buildSelector(tag)));
+      }
+    } else {
+      violations.push(v("select-missing-label", "moderate", "WCAG 1.3.1",
         "Select (dropdown) element does not have an associated label. Screen reader users cannot identify the purpose of this control.",
-        "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 2000), buildSelector(tag)));
+        "https://wave.webaim.org/api/references#a_select_missing_label", truncate(tag, 2000), buildSelector(tag)));
     }
   }
 
@@ -616,7 +653,14 @@ function analyzeAccessibility(
   while ((match = textareaRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
-    if (!controlHasLabel(tag, match.index)) {
+    if (controlHasLabel(tag, match.index)) {
+      passCount++;
+      if (labelTitleOnly(tag, match.index)) {
+        violations.push(v("label-title", "moderate", "WCAG 1.3.1",
+          "Textarea element is labeled only with a title attribute. A proper <label>, aria-label, or aria-labelledby is recommended.",
+          "https://wave.webaim.org/api/references#a_label_title", truncate(tag, 2000), buildSelector(tag)));
+      }
+    } else {
       violations.push(v("label", "serious", "WCAG 1.3.1",
         "Textarea element does not have an associated label.",
         "https://wave.webaim.org/api/references#e_label_missing", truncate(tag, 2000), buildSelector(tag)));

@@ -89,6 +89,28 @@ const FIX_RECOMMENDATIONS: Record<string, { summary: string; code: string }> = {
 <!-- Option 2: aria-label -->
 <input type="search" aria-label="Search products">`,
   },
+  "label-title": {
+    summary: "Using only a title attribute is a fragile label. Replace it with a <label>, aria-label, or aria-labelledby.",
+    code: `<!-- Before -->
+<input type="text" title="Search">
+
+<!-- After -->
+<label for="q">Search</label>
+<input id="q" type="text">`,
+  },
+  "select-missing-label": {
+    summary: "A <select> dropdown needs a programmatic label so screen readers announce its purpose.",
+    code: `<!-- Option 1: for/id pairing -->
+<label for="country">Country</label>
+<select id="country" name="country">
+  <option value="us">United States</option>
+</select>
+
+<!-- Option 2: aria-label -->
+<select aria-label="Country" name="country">
+  <option value="us">United States</option>
+</select>`,
+  },
   "label-empty": {
     summary: "A <label> element must contain visible text.",
     code: `<!-- Before -->
