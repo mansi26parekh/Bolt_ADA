@@ -680,11 +680,21 @@ function analyzeAccessibility(
   }
 
   // ── 7. Multiple labels (WAVE: label_multiple) ──
-  for (const [forId, count] of Object.entries(labelForCounts)) {
+  // WAVE evaluates each form control instance independently. If the same form
+  // is rendered multiple times on a page, each instance with multiple labels
+  // is reported as a separate violation — no deduplication by id or selector.
+  const formControlRe = /<(?:input|select|textarea)\b[^>]*>/gi;
+  while ((match = formControlRe.exec(cleanHtml)) !== null) {
+    const tag = match[0];
+    if (inNoscript(match.index)) continue;
+    const idm = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (!idm) continue;
+    const forId = idm[1];
+    const count = labelForCounts[forId] || 0;
     if (count > 1) {
       violations.push(v("multiple-labels", "serious", "WCAG 1.3.1",
         `Form control with id="${forId}" has ${count} associated <label> elements. Multiple labels create ambiguous instructions for screen reader users.`,
-        "https://wave.webaim.org/api/references#e_label_multiple", `label[for="${forId}"]`, `[id="${forId}"]`));
+        "https://wave.webaim.org/api/references#e_label_multiple", truncate(tag, 2000), buildSelector(tag)));
     }
   }
 
