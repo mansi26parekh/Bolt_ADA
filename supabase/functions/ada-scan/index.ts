@@ -671,6 +671,32 @@ function analyzeAccessibility(
     }
   }
 
+  // ── 5b. Captcha response fields (WAVE: label_missing on JS-injected textarea) ──
+  // reCAPTCHA/hCaptcha inject hidden <textarea> response fields at runtime via JS.
+  // These never appear in static HTML but WAVE (which executes JS) flags them as
+  // Missing Form Label. We detect the captcha presence from its script/container
+  // markers and synthesize the violation to match WAVE's reporting.
+  // reCAPTCHA markers: <script src="...recaptcha/api.js"> or <div class="g-recaptcha" ...>
+  // hCaptcha markers: <script src="...hcaptcha.com/1/api.js"> or <div class="h-captcha" ...>
+  const recaptchaScriptRe = /<script\b[^>]*\bsrc\s*=\s*["'][^"']*recaptcha\/(?:api|enterprise)[^"']*["'][^>]*>/gi;
+  const recaptchaDivRe = /<(?:div|textarea)\b[^>]*\bclass\s*=\s*["'][^"']*\bg-recaptcha\b[^"']*["'][^>]*>/gi;
+  const hasRecaptcha = recaptchaScriptRe.test(cleanHtml) || recaptchaDivRe.test(cleanHtml);
+  if (hasRecaptcha) {
+    violations.push(v("label", "serious", "WCAG 1.3.1",
+      "reCAPTCHA injects a hidden response textarea (id=\"g-recaptcha-response\") without an accessible label. Screen reader users cannot identify this control.",
+      "https://wave.webaim.org/api/references#e_label_missing",
+      '<textarea id="g-recaptcha-response" name="g-recaptcha-response">', '#g-recaptcha-response'));
+  }
+  const hcaptchaScriptRe = /<script\b[^>]*\bsrc\s*=\s*["'][^"']*hcaptcha\.com\/[^"']*["'][^>]*>/gi;
+  const hcaptchaDivRe = /<(?:div|textarea)\b[^>]*\bclass\s*=\s*["'][^"']*\bh-captcha\b[^"']*["'][^>]*>/gi;
+  const hasHcaptcha = hcaptchaScriptRe.test(cleanHtml) || hcaptchaDivRe.test(cleanHtml);
+  if (hasHcaptcha) {
+    violations.push(v("label", "serious", "WCAG 1.3.1",
+      "hCaptcha injects a hidden response textarea (id=\"h-captcha-response\") without an accessible label. Screen reader users cannot identify this control.",
+      "https://wave.webaim.org/api/references#e_label_missing",
+      '<textarea id="h-captcha-response" name="h-captcha-response">', '#h-captcha-response'));
+  }
+
   // ── 6. Empty labels (WAVE: label_empty) ──
   const labelFullRe = /<label\b[^>]*>([\s\S]*?)<\/label>/gi;
   while ((match = labelFullRe.exec(cleanHtml)) !== null) {
