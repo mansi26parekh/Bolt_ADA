@@ -517,6 +517,16 @@ function analyzeAccessibility(
     return true;
   }
 
+  // WAVE excludes auto-generated captcha response fields from label checks.
+  // reCAPTCHA injects <textarea id="g-recaptcha-response"> and hCaptcha injects
+  // <textarea id="h-captcha-response"> — both hidden, not for user interaction.
+  function isCaptchaResponseField(tag: string): boolean {
+    const idm = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (!idm) return false;
+    const id = idm[1].toLowerCase();
+    return id === "g-recaptcha-response" || id === "h-captcha-response";
+  }
+
   // ── 1. Images: missing alt ──
   const imgRe = /<img\b[^>]*>/gi;
   while ((match = imgRe.exec(cleanHtml)) !== null) {
@@ -593,6 +603,7 @@ function analyzeAccessibility(
   while ((match = inputRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
+    if (isCaptchaResponseField(tag)) continue;
     const tm = /\btype\s*=\s*["']([^"']+)["']/i.exec(tag);
     const inputType = tm ? tm[1].toLowerCase() : "text";
     if (inputType === "image") {
@@ -631,10 +642,14 @@ function analyzeAccessibility(
   }
 
   // WAVE: select_missing_label is an ALERT (not error) — same label logic as inputs
+  // Track select elements flagged here so the combined form-control loop below
+  // cannot duplicate-report them under multiple-labels for the same root cause.
+  const selectMissingLabelIndices = new Set<number>();
   const selectRe = /<select\b[^>]*>/gi;
   while ((match = selectRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
+    if (isCaptchaResponseField(tag)) continue;
     if (controlHasLabel(tag, match.index)) {
       passCount++;
       if (labelTitleOnly(tag, match.index)) {
@@ -643,6 +658,7 @@ function analyzeAccessibility(
           "https://wave.webaim.org/api/references#a_label_title", truncate(tag, 2000), buildSelector(tag)));
       }
     } else {
+      selectMissingLabelIndices.add(match.index);
       violations.push(v("select-missing-label", "moderate", "WCAG 1.3.1",
         "Select (dropdown) element does not have an associated label. Screen reader users cannot identify the purpose of this control.",
         "https://wave.webaim.org/api/references#a_select_missing_label", truncate(tag, 2000), buildSelector(tag)));
@@ -653,6 +669,7 @@ function analyzeAccessibility(
   while ((match = textareaRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
+    if (isCaptchaResponseField(tag)) continue;
     if (controlHasLabel(tag, match.index)) {
       passCount++;
       if (labelTitleOnly(tag, match.index)) {
@@ -687,6 +704,7 @@ function analyzeAccessibility(
   while ((match = formControlRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
+    if (/^<select\b/i.test(tag) && selectMissingLabelIndices.has(match.index)) continue;
     const idm = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
     if (!idm) continue;
     const forId = idm[1];
