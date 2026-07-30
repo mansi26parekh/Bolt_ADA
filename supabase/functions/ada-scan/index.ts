@@ -517,16 +517,6 @@ function analyzeAccessibility(
     return true;
   }
 
-  // WAVE excludes auto-generated captcha response fields from label checks.
-  // reCAPTCHA injects <textarea id="g-recaptcha-response"> and hCaptcha injects
-  // <textarea id="h-captcha-response"> — both hidden, not for user interaction.
-  function isCaptchaResponseField(tag: string): boolean {
-    const idm = /\bid\s*=\s*["']([^"']+)["']/i.exec(tag);
-    if (!idm) return false;
-    const id = idm[1].toLowerCase();
-    return id === "g-recaptcha-response" || id === "h-captcha-response";
-  }
-
   // ── 1. Images: missing alt ──
   const imgRe = /<img\b[^>]*>/gi;
   while ((match = imgRe.exec(cleanHtml)) !== null) {
@@ -603,7 +593,6 @@ function analyzeAccessibility(
   while ((match = inputRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
-    if (isCaptchaResponseField(tag)) continue;
     const tm = /\btype\s*=\s*["']([^"']+)["']/i.exec(tag);
     const inputType = tm ? tm[1].toLowerCase() : "text";
     if (inputType === "image") {
@@ -649,7 +638,6 @@ function analyzeAccessibility(
   while ((match = selectRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
-    if (isCaptchaResponseField(tag)) continue;
     if (controlHasLabel(tag, match.index)) {
       passCount++;
       if (labelTitleOnly(tag, match.index)) {
@@ -669,7 +657,6 @@ function analyzeAccessibility(
   while ((match = textareaRe.exec(cleanHtml)) !== null) {
     const tag = match[0];
     if (inNoscript(match.index)) continue;
-    if (isCaptchaResponseField(tag)) continue;
     if (controlHasLabel(tag, match.index)) {
       passCount++;
       if (labelTitleOnly(tag, match.index)) {
