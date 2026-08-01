@@ -217,7 +217,12 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
       try {
         const res = await fetch(
           `${PROXY_BASE}?url=${encodeURIComponent(pageUrl)}`,
-          { headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` } }
+          {
+            headers: {
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+          }
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const html = await res.text();

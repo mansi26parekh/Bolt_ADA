@@ -162,6 +162,10 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // Strip CSP meta tags so the injected highlight script can run inside the
+  // blob-URL iframe (the original site's CSP would otherwise block inline scripts)
+  html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, "");
+
   // Inject <base> so relative URLs resolve against the original origin
   const origin = new URL(targetUrl).origin;
   const baseTag = `<base href="${origin}/">`;
