@@ -166,6 +166,72 @@ function dedupeUrl(raw: string, base: string, rootOriginLen: number): string | n
   }
 }
 
+// ─── Sitemap discovery ───
+
+async function fetchSitemapUrls(origin: string): Promise<Set<string>> {
+  const urls = new Set<string>();
+
+  // 1. Check robots.txt for Sitemap: directives
+  try {
+    const robotsRes = await fetch(`${origin}/robots.txt`, {
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ADA-Scanner/2.0; +https://ada-scanner.dev)",
+        Accept: "text/plain, */*",
+      },
+      redirect: "follow",
+    });
+    if (robotsRes.ok) {
+      const robotsText = await robotsRes.text();
+      const sitemapRe = /^Sitemap:\s*(.+)/gim;
+      let sm: RegExpExecArray | null;
+      while ((sm = sitemapRe.exec(robotsText)) !== null) {
+        await parseSitemap(sm[1].trim(), urls, 0);
+      }
+    }
+  } catch { /* robots.txt not available */ }
+
+  // 2. Try /sitemap.xml directly if no sitemaps found via robots.txt
+  if (urls.size === 0) {
+    await parseSitemap(`${origin}/sitemap.xml`, urls, 0);
+  }
+
+  return urls;
+}
+
+async function parseSitemap(sitemapUrl: string, urls: Set<string>, depth: number): Promise<void> {
+  if (depth > 2) return;
+
+  let res: Response;
+  try {
+    res = await fetch(sitemapUrl, {
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ADA-Scanner/2.0; +https://ada-scanner.dev)",
+        Accept: "application/xml, text/xml, */*",
+      },
+      redirect: "follow",
+    });
+  } catch { return; }
+
+  if (!res.ok) return;
+
+  const text = await res.text();
+  const locRe = /<loc>\s*([^<]+?)\s*<\/loc>/gi;
+
+  if (/<sitemapindex/i.test(text)) {
+    let m: RegExpExecArray | null;
+    while ((m = locRe.exec(text)) !== null) {
+      await parseSitemap(m[1].trim(), urls, depth + 1);
+    }
+  } else {
+    let m: RegExpExecArray | null;
+    while ((m = locRe.exec(text)) !== null) {
+      urls.add(m[1].trim());
+    }
+  }
+}
+
 async function runMultiPageScan(
   supabase: ReturnType<typeof createClient>,
   scanId: string,
@@ -200,6 +266,23 @@ async function runMultiPageScan(
   visited.add(root);
   queue.push({ url: root, depth: 0 });
 
+  // Fetch sitemap and seed queue with any URLs not yet discovered by BFS
+  try {
+    const sitemapUrls = await fetchSitemapUrls(new URL(rootUrl).origin);
+    for (const smUrl of sitemapUrls) {
+      const norm = dedupeUrl(smUrl, rootUrl, rootOriginLen);
+      if (!norm || visited.has(norm) || visited.size >= maxPages) continue;
+      if (NON_HTML_RE.test(norm)) continue;
+      try {
+        if (new URL(norm).hostname !== rootHostname) continue;
+      } catch { continue; }
+      visited.add(norm);
+      queue.push({ url: norm, depth: 0 });
+    }
+  } catch (err) {
+    console.error("Sitemap fetch failed:", err);
+  }
+
   const processPage = async (url: string, depth: number) => {
     // Run DB insert and HTTP fetch in parallel — saves ~100ms per page
     const insertPromise = supabase
@@ -208,7 +291,7 @@ async function runMultiPageScan(
       .select("id")
       .single();
 
-    let pageData: { html: string; title: string; links: string[] };
+    let pageData: { html: string; title: string; links: string[]; baseUrl: string };
     try {
       pageData = await fetchPage(url);
     } catch (err) {
@@ -226,7 +309,7 @@ async function runMultiPageScan(
 
     // Enqueue discovered links
     for (const link of pageData.links) {
-      const norm = dedupeUrl(link, rootUrl, rootOriginLen);
+      const norm = dedupeUrl(link, pageData.baseUrl, rootOriginLen);
       if (!norm || visited.has(norm) || visited.size >= maxPages) continue;
       if (depth + 1 > maxDepth || NON_HTML_RE.test(norm)) continue;
       try {
@@ -317,7 +400,7 @@ async function runMultiPageScan(
 
 // ─── Page fetching ───
 
-async function fetchPage(url: string): Promise<{ html: string; title: string; links: string[] }> {
+async function fetchPage(url: string): Promise<{ html: string; title: string; links: string[]; baseUrl: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s — fail fast on slow pages
 
@@ -351,11 +434,19 @@ async function fetchPage(url: string): Promise<{ html: string; title: string; li
   const title = titleMatch ? decodeEntities(titleMatch[1].trim()) : new URL(url).pathname;
 
   const linkRegex = /<a[^>]+href\s*=\s*["']([^"']+)["']/gi;
+  const areaRegex = /<area[^>]+href\s*=\s*["']([^"']+)["']/gi;
   const links: string[] = [];
   let m;
   while ((m = linkRegex.exec(html)) !== null) links.push(m[1]);
+  while ((m = areaRegex.exec(html)) !== null) links.push(m[1]);
 
-  return { html, title, links };
+  let baseUrl = url;
+  const baseMatch = html.match(/<base\b[^>]*\bhref\s*=\s*["']([^"']+)["']/i);
+  if (baseMatch) {
+    try { baseUrl = new URL(baseMatch[1], url).toString(); } catch { /* keep page URL */ }
+  }
+
+  return { html, title, links, baseUrl };
 }
 
 function decodeEntities(str: string): string {
