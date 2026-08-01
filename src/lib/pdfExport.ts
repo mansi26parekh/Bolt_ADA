@@ -195,18 +195,6 @@ export function generateDeveloperReport(scanData: ScanData) {
   const domain = scan.url.replace(/https?:\/\//,"").replace(/\/.*$/,"");
   const totalPages = pagesWithIssues.length;
 
-  // Build page data for the inspect modal
-  const pageData = pagesWithIssues.map(page => ({
-    url:    page.url,
-    title:  page.title,
-    score:  page.score,
-    count:  page.count,
-    rows:   page.rows,
-  }));
-
-  const pageDataJson = JSON.stringify(pageData)
-    .replace(/</g,"\\u003c").replace(/>/g,"\\u003e").replace(/&/g,"\\u0026");
-
   // Pre-render all page blocks as static HTML (visible without JavaScript)
   const scoreColorTs = (s: number | null): string => {
     if (s === null || s === undefined) return "#64748b";
@@ -228,7 +216,6 @@ export function generateDeveloperReport(scanData: ScanData) {
         <td><span class="badge badge-${lvl}">${lbl}</span></td>
         <td><span class="el-code" title="${esc(r.el)}">${esc(elShort)}</span></td>
         <td style="color:#475569">${esc(r.fix)}</td>
-        <td><a class="inspect-btn" href="${esc(page.url)}" target="_blank" rel="noopener" data-p="${pi}" data-r="${ri}"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg> Inspect</a></td>
         <td><span class="status-open">Open</span></td>
       </tr>`;
     }).join("");
@@ -247,12 +234,11 @@ export function generateDeveloperReport(scanData: ScanData) {
       </div>
       <div class="issues-wrap">
         <table class="issues-table"><thead><tr>
-          <th style="width:21%">Issue</th>
-          <th style="width:10%">Severity</th>
-          <th style="width:21%">Affected Element</th>
-          <th style="width:27%">Suggested Fix</th>
-          <th style="width:12%">Inspect Issue</th>
-          <th style="width:9%">Status</th>
+          <th style="width:25%">Issue</th>
+          <th style="width:12%">Severity</th>
+          <th style="width:25%">Affected Element</th>
+          <th style="width:28%">Suggested Fix</th>
+          <th style="width:10%">Status</th>
         </tr></thead><tbody>${rowsHtml}</tbody></table>
       </div>
     </div>`;
@@ -375,59 +361,6 @@ a{color:var(--blue);text-decoration:none}
          max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
          border:1px solid #ccdaf5;cursor:default}
 
-/* ── Inspect button ── */
-.inspect-btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
-            color:var(--blue);padding:4px 10px;border-radius:6px;border:1px solid var(--blue-mid);
-            background:var(--blue-light);white-space:nowrap;cursor:pointer;
-            transition:background .15s,transform .1s;font-family:inherit;text-decoration:none}
-.inspect-btn:hover{background:#bfdbfe;transform:translateY(-1px)}
-.inspect-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;
-                stroke-linecap:round;stroke-linejoin:round}
-
-/* ── Modal ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);
-               display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
-.modal-overlay.show{display:flex;animation:fadeIn .15s ease}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.modal{background:var(--surface);border-radius:14px;max-width:560px;width:100%;
-       box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;animation:slideUp .2s ease}
-@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
-.modal-head{padding:16px 20px;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;
-            display:flex;align-items:center;justify-content:space-between}
-.modal-head h3{font-size:15px;font-weight:700}
-.modal-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;
-             border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;
-             justify-content:center;transition:background .15s}
-.modal-close:hover{background:rgba(255,255,255,.35)}
-.modal-body{padding:20px}
-.modal-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-             color:var(--muted);margin-bottom:6px;margin-top:14px}
-.modal-label:first-child{margin-top:0}
-.modal-desc{font-size:12px;color:#475569;line-height:1.6}
-.code-block{font-family:"SF Mono",Menlo,Monaco,Consolas,monospace;font-size:11px;color:#1e293b;
-            background:#f1f6fc;border:1px solid var(--border);border-radius:8px;
-            padding:10px 12px;white-space:pre-wrap;word-break:break-all;line-height:1.5;
-            position:relative}
-.copy-btn{position:absolute;top:8px;right:8px;background:var(--blue);color:#fff;border:none;
-          padding:4px 10px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;
-          font-family:inherit;transition:background .15s}
-.copy-btn:hover{background:#1e40af}
-.copy-btn.copied{background:#059669}
-.modal-actions{display:flex;gap:10px;margin-top:18px}
-.modal-btn{flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
-           border:1px solid var(--border);background:var(--surface);color:var(--text);
-           transition:all .15s;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
-.modal-btn:hover{background:var(--surface2)}
-.modal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
-.modal-btn.primary:hover{background:#1e40af}
-.modal-hint{font-size:11px;color:var(--blue);margin-top:12px;padding:8px 12px;
-             background:var(--blue-light);border-radius:8px;border:1px solid var(--blue-mid);
-             line-height:1.5;display:none}
-.modal-hint:not(:empty){display:block}
-.modal-hint kbd{display:inline-block;font-family:monospace;font-size:10px;padding:1px 5px;
-  background:#1e293b;color:#fff;border-radius:4px;border:1px solid #334155;margin:0 1px}
-.modal-hint a:hover{text-decoration:underline}
-
 /* ── Status ── */
 .status-open{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;
              font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #fde68a}
@@ -462,7 +395,7 @@ a{color:var(--blue);text-decoration:none}
     <div class="logo">A</div>
     <div>
       <div class="topbar h1" style="font-size:18px;font-weight:700;color:#fff">ADA Scanner — Developer Report</div>
-      <div class="sub">Technical accessibility audit with inspectable element references</div>
+      <div class="sub">Technical accessibility audit report</div>
     </div>
   </div>
   <div class="score-pill">
@@ -498,113 +431,6 @@ a{color:var(--blue);text-decoration:none}
   </div>
 </div>
 
-<div class="modal-overlay" id="inspect-modal">
-  <div class="modal">
-    <div class="modal-head">
-      <h3 id="modal-title">Inspect Issue</h3>
-      <button class="modal-close" id="modal-close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-label">Issue</div>
-      <div class="modal-desc" id="modal-issue"></div>
-      <div class="modal-label">Description</div>
-      <div class="modal-desc" id="modal-desc"></div>
-      <div class="modal-label">CSS Selector</div>
-      <div class="code-block" id="modal-selector"></div>
-      <div class="modal-label">DevTools Console Command</div>
-      <div class="code-block" id="modal-cmd"></div>
-      <div class="modal-actions">
-        <button class="modal-btn" id="btn-open-page">Open Page &rarr;</button>
-        <button class="modal-btn primary" id="btn-highlight">Highlight on Page</button>
-      </div>
-      <div class="modal-hint" id="modal-hint"></div>
-    </div>
-  </div>
-</div>
-
-<script>
-(function(){
-  var DATA = ${pageDataJson};
-  var currentIssue = null;
-  var modal = document.getElementById('inspect-modal');
-  if(!modal) return;
-  var hintEl = document.getElementById('modal-hint');
-
-  function esc(s){
-    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  }
-
-  function buildCmd(sel){
-    if(!sel) return "document.body";
-    var s = sel.replace(/'/g,"\\'");
-    return "var el=document.querySelector('"+s+"');if(el){el.style.outline='4px solid #dc2626';el.style.outlineOffset='2px';el.scrollIntoView({behavior:'smooth',block:'center'});console.log('ADA Scanner: element highlighted',el);}else{console.warn('ADA Scanner: element not found for selector: "+s+"');}";
-  }
-
-  function clip(text){
-    var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);
-    ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);
-  }
-
-  function openInspect(pi,ri){
-    var p=DATA[pi];if(!p)return;
-    var r=p.rows[ri];if(!r)return;
-    currentIssue=r;
-    document.getElementById('modal-title').textContent=r.title||'Inspect Issue';
-    document.getElementById('modal-issue').textContent=r.title||'\u2014';
-    document.getElementById('modal-desc').textContent=r.desc||'No description available.';
-    var sel=r.selector||r.el||'No selector available';
-    document.getElementById('modal-selector').innerHTML='<button class="copy-btn" data-copy="modal-selector">Copy</button>'+esc(sel);
-    var cmd=buildCmd(r.selector||r.el||'');
-    document.getElementById('modal-cmd').innerHTML='<button class="copy-btn" data-copy="modal-cmd">Copy</button>'+esc(cmd);
-    if(hintEl) hintEl.textContent='';
-    modal.classList.add('show');
-    document.body.style.overflow='hidden';
-  }
-
-  function closeModal(){
-    modal.classList.remove('show');
-    document.body.style.overflow='';
-  }
-
-  document.addEventListener('click',function(e){
-    var ib=e.target.closest('.inspect-btn');
-    if(ib&&ib.dataset.p!==undefined){
-      e.preventDefault();openInspect(+ib.dataset.p,+ib.dataset.r);return;
-    }
-    var cb=e.target.closest('[data-copy]');
-    if(cb){
-      var el=document.getElementById(cb.dataset.copy);
-      clip(el.textContent.replace(/^Copy/,'').trim());
-      cb.textContent='Copied!';cb.classList.add('copied');
-      setTimeout(function(){cb.textContent='Copy';cb.classList.remove('copied');},1500);return;
-    }
-    if(e.target.id==='modal-close'||e.target===modal){closeModal();return;}
-    if(e.target.closest('#btn-open-page')){
-      if(currentIssue&&currentIssue.pageUrl) window.open(currentIssue.pageUrl,'_blank');return;
-    }
-    var hl=e.target.closest('#btn-highlight');
-    if(hl){
-      if(!currentIssue)return;
-      var sel=currentIssue.selector||currentIssue.el||'';
-      var cmd=buildCmd(sel);
-      clip(cmd);
-      var url=currentIssue.pageUrl;
-      var w=null;
-      try{w=window.open(url,'_blank');}catch(ex){}
-      if(w){
-        hintEl.innerHTML='<strong>Command copied to clipboard!</strong><br>The page opened in a new tab. On that page:<br>1. Press <kbd>F12</kbd> (or right-click \u2192 Inspect)<br>2. Click the <strong>Console</strong> tab<br>3. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste<br>4. Press <kbd>Enter</kbd> \u2014 the element will be highlighted in red.';
-      }else{
-        hintEl.innerHTML='<strong>Command copied to clipboard!</strong><br>Popup was blocked, so open the page manually:<br>1. Open: <a href="'+esc(url)+'" target="_blank" style="color:#1e40af;text-decoration:underline">'+esc(url)+'</a><br>2. Press <kbd>F12</kbd> \u2192 <strong>Console</strong> tab<br>3. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste<br>4. Press <kbd>Enter</kbd> \u2014 the element will be highlighted in red.';
-      }
-      return;
-    }
-  });
-
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape'&&modal.classList.contains('show'))closeModal();
-  });
-})();
-</script>
 </body>
 </html>`;
 
