@@ -9,6 +9,7 @@ import {
   BarChart3,
   History,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import type { Project } from "../lib/types";
 
@@ -28,6 +29,7 @@ export function LandingPage({
   onSelectProject,
 }: LandingPageProps) {
   const [url, setUrl] = useState(initialUrl);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   const [retestChoice, setRetestChoice] = useState<"yes" | "no" | "">("");
   const [showAllProjects, setShowAllProjects] = useState(false);
@@ -38,9 +40,31 @@ export function LandingPage({
     if (initialUrl) setUrl(initialUrl);
   }, [initialUrl]);
 
+  const validateUrl = (raw: string): string | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return "Please enter a website URL to scan.";
+    let candidate = trimmed;
+    if (!/^https?:\/\//i.test(candidate)) candidate = "https://" + candidate;
+    try {
+      const parsed = new URL(candidate);
+      if (!parsed.hostname || !parsed.hostname.includes(".")) {
+        return "Please enter a valid website URL (e.g. example.com).";
+      }
+      return null;
+    } catch {
+      return "Please enter a valid website URL (e.g. example.com).";
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    const err = validateUrl(url);
+    if (err) {
+      setUrlError(err);
+      urlInputRef.current?.focus();
+      return;
+    }
+    setUrlError(null);
     let finalUrl = url.trim();
     if (!/^https?:\/\//i.test(finalUrl)) {
       finalUrl = "https://" + finalUrl;
@@ -120,7 +144,7 @@ export function LandingPage({
                       ref={urlInputRef}
                       type="text"
                       value={url}
-                      onChange={(e) => setUrl(e.target.value)}
+                      onChange={(e) => { setUrl(e.target.value); if (urlError) setUrlError(null); }}
                       placeholder="Enter your website URL..."
                       className="flex-1 bg-transparent text-white placeholder-slate-500 py-3.5 text-base outline-none"
                       autoFocus
@@ -136,9 +160,10 @@ export function LandingPage({
                 </div>
               </div>
 
-              {error && (
-                <div className="mt-3 px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                  {error}
+              {(urlError || error) && (
+                <div className="mt-3 px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {urlError || error}
                 </div>
               )}
             </form>

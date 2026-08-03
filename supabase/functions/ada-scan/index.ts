@@ -510,6 +510,33 @@ function analyzeAccessibility(
   }
   const inNoscript = (pos: number) => noscriptRanges.some(([s, e]) => pos >= s && pos <= e);
 
+  // Pre-compute template ranges — content inside <template> is not rendered
+  const templateRanges: Array<[number, number]> = [];
+  const _templateRe = /<template\b[^>]*>[\s\S]*?<\/template>/gi;
+  let _tplM: RegExpExecArray | null;
+  while ((_tplM = _templateRe.exec(cleanHtml)) !== null) {
+    templateRanges.push([_tplM.index, _tplM.index + _tplM[0].length]);
+  }
+  const inTemplate = (pos: number) => templateRanges.some(([s, e]) => pos >= s && pos <= e);
+
+  // WAVE ignores elements not exposed to the accessibility tree.
+  // Checks the element's own attributes for hidden/aria-hidden/role/style hiding.
+  function isHiddenFromA11y(tag: string, pos: number): boolean {
+    if (inTemplate(pos)) return true;
+    if (inNoscript(pos)) return true;
+    // Boolean hidden attribute (not aria-hidden — the space prefix excludes it)
+    if (/\shidden(?=\s|>|\/|=)/i.test(tag)) return true;
+    if (/\baria-hidden\s*=\s*["']true["']/i.test(tag)) return true;
+    if (/\brole\s*=\s*["'](?:presentation|none)["']/i.test(tag)) return true;
+    const styleMatch = /\bstyle\s*=\s*["']([^"']*)["']/i.exec(tag);
+    if (styleMatch) {
+      const style = styleMatch[1].toLowerCase();
+      if (/display\s*:\s*none/.test(style)) return true;
+      if (/visibility\s*:\s*hidden/.test(style)) return true;
+    }
+    return false;
+  }
+
   // Pre-compute all IDs
   const allIds = new Set<string>();
   const allIdRe = /\bid\s*=\s*["']([^"']+)["']/gi;
@@ -646,8 +673,8 @@ function analyzeAccessibility(
         "https://wave.webaim.org/api/references#e_alt_link_missing", truncate(fullTag, 2000), buildSelector(fullTag)));
     }
 
-    // Empty link (WAVE: link_empty)
-    if (!/\baria-hidden\s*=\s*["']true["']/i.test(openTag)) {
+    // Empty link (WAVE: link_empty) — skip elements not in the accessibility tree
+    if (!isHiddenFromA11y(openTag, match.index)) {
       const accessible = hasAL || hasALB || hasT || hasImgAlt || hasSvg || text.length > 0;
       if (!accessible) {
         violations.push(v("link-name", "serious", "WCAG 4.1.2",
@@ -696,6 +723,7 @@ function analyzeAccessibility(
     }
     if (inputType === "hidden" || inputType === "submit" || inputType === "reset") continue;
     if (inputType === "button") {
+      if (isHiddenFromA11y(tag, match.index)) continue;
       // WAVE: type="button" without value/label → button_empty (not label_missing)
       if (/\bvalue\s*=\s*["'][^"']+["']/i.test(tag) || controlHasLabel(tag, match.index)) {
         passCount++;
@@ -827,6 +855,7 @@ function analyzeAccessibility(
     const openTag = fullTag.match(/<button[^>]*/i)?.[0] || "";
     const inner = match[1];
     if (inNoscript(match.index)) continue;
+    if (isHiddenFromA11y(openTag, match.index)) continue;
     const accessible =
       /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag) ||
       /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag) ||
