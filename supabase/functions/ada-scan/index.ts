@@ -631,6 +631,14 @@ function analyzeAccessibility(
     const inner = match[1];
     if (inNoscript(match.index)) continue;
 
+    // Skip Vue/Alpine template directives (:href, v-html, v-text, v-if, x-html, etc.)
+    // These are framework template placeholders, not real rendered links. WAVE
+    // executes JS and evaluates the rendered DOM, so it never sees these as empty.
+    if (/\s:[a-z]/i.test(openTag) || /\bv-(?:html|text|if|show|bind|for)\b/i.test(openTag) || /\bx-(?:html|text)\b/i.test(openTag)) {
+      passCount++;
+      continue;
+    }
+
     // Skip links explicitly removed from the accessibility tree via aria-hidden="true"
     // on the anchor itself. WAVE excludes these because AT never sees them.
     if (/\baria-hidden\s*=\s*["']true["']/i.test(openTag)) { passCount++; continue; }
