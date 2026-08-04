@@ -631,6 +631,10 @@ function analyzeAccessibility(
     const inner = match[1];
     if (inNoscript(match.index)) continue;
 
+    // Skip links explicitly removed from the accessibility tree via aria-hidden="true"
+    // on the anchor itself. WAVE excludes these because AT never sees them.
+    if (/\baria-hidden\s*=\s*["']true["']/i.test(openTag)) { passCount++; continue; }
+
     const hasAL     = /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag);
     const hasALB    = /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag);
     const hasT      = /\btitle\s*=\s*["'][^"']+["']/i.test(openTag);
@@ -696,6 +700,8 @@ function analyzeAccessibility(
     }
     if (inputType === "hidden" || inputType === "submit" || inputType === "reset") continue;
     if (inputType === "button") {
+      // Skip inputs removed from the accessibility tree via aria-hidden="true"
+      if (/\baria-hidden\s*=\s*["']true["']/i.test(tag)) { passCount++; continue; }
       // WAVE: type="button" without value/label → button_empty (not label_missing)
       if (/\bvalue\s*=\s*["'][^"']+["']/i.test(tag) || controlHasLabel(tag, match.index)) {
         passCount++;
@@ -827,7 +833,8 @@ function analyzeAccessibility(
     const openTag = fullTag.match(/<button[^>]*/i)?.[0] || "";
     const inner = match[1];
     if (inNoscript(match.index)) continue;
-    // WAVE intentionally flags hidden buttons (aria-hidden, display:none, etc.)
+    // Skip buttons explicitly removed from the accessibility tree via aria-hidden="true"
+    if (/\baria-hidden\s*=\s*["']true["']/i.test(openTag)) { passCount++; continue; }
     const accessible =
       /\baria-label\s*=\s*["'][^"']+["']/i.test(openTag) ||
       /\baria-labelledby\s*=\s*["'][^"']+["']/i.test(openTag) ||
