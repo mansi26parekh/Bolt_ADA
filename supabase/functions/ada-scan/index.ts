@@ -4,6 +4,7 @@ import {
   calculatePageScore,
   calculateOverallScore,
 } from "./analysis.ts";
+import { fetchRenderedPage } from "./browser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -285,7 +286,7 @@ async function runMultiPageScan(
 
     let pageData: { html: string; title: string; links: string[]; baseUrl: string };
     try {
-      pageData = await fetchPage(url);
+      pageData = await fetchPageWithRendering(url);
     } catch (err) {
       console.error(`Fetch failed: ${url}`, err);
       const { data: pageRecord } = await insertPromise;
@@ -386,7 +387,21 @@ async function runMultiPageScan(
 
 // ─── Page fetching ───
 
-async function fetchPage(url: string): Promise<{ html: string; title: string; links: string[]; baseUrl: string }> {
+type PageData = { html: string; title: string; links: string[]; baseUrl: string };
+
+async function fetchPageWithRendering(url: string): Promise<PageData> {
+  const browserWs = Deno.env.get("BROWSER_WS_ENDPOINT");
+  if (browserWs) {
+    try {
+      return await fetchRenderedPage(browserWs, url);
+    } catch (err) {
+      console.warn(`Browser rendering failed for ${url}, falling back to static fetch:`, err);
+    }
+  }
+  return fetchPage(url);
+}
+
+async function fetchPage(url: string): Promise<PageData> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
