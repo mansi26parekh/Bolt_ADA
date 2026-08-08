@@ -361,36 +361,40 @@ export function analyzeAccessibility(
       return;
     }
 
-    // No accessible name — check whether the link's only content is image(s)
-    // with missing/invalid alt. If so, defer to the image-alt rule.
-    const imgs = link.querySelectorAll("img");
+    // No accessible name — check whether the link's only meaningful content
+    // is image(s) with missing/invalid alt. If so, defer to the image-alt
+    // rule (WAVE: "Linked image missing alternative text") instead of
+    // reporting Empty Link.
+    //
+    // "Only meaningful content is images" means: walking the entire subtree,
+    // after skipping aria-hidden branches, every leaf that contributes
+    // content is an <img>. Wrapper elements (<span>, <div>, <figure>) are
+    // transparent — we recurse through them.
     const meaningfulImgs: any[] = [];
-    for (const img of Array.from(imgs) as any[]) {
-      if (!isPresentation(img) && !isAriaHidden(img)) meaningfulImgs.push(img);
-    }
-
-    if (meaningfulImgs.length > 0) {
-      // Check whether images are the ONLY non-trivial content in the link.
-      const childElements: any[] = [];
-      for (const node of Array.from(link.childNodes) as any[]) {
-        if (node.nodeType === 3 && node.textContent && node.textContent.trim()) {
-          childElements.push(node); // non-whitespace text node
-        } else if (node.nodeType === 1) {
-          if (node.getAttribute && node.getAttribute("aria-hidden") === "true") continue;
-          childElements.push(node);
+    function hasOnlyImageContent(node: any): boolean {
+      for (const child of Array.from(node.childNodes) as any[]) {
+        if (child.nodeType === 3) {
+          if (child.textContent && child.textContent.trim()) return false;
+        } else if (child.nodeType === 1) {
+          if (child.getAttribute && child.getAttribute("aria-hidden") === "true") continue;
+          if (child.tagName === "IMG") {
+            if (!isPresentation(child) && !isAriaHidden(child)) meaningfulImgs.push(child);
+          } else if (child.tagName === "SVG") {
+            return false;
+          } else if (child.tagName === "BR") {
+            continue;
+          } else {
+            if (!hasOnlyImageContent(child)) return false;
+          }
         }
       }
-      const onlyImages = childElements.length > 0 && childElements.every(
-        (n: any) => n.nodeType === 1 && n.tagName === "IMG"
-      );
+      return true;
+    }
 
-      if (onlyImages) {
-        // All content is images — let the image-alt rule report each one as
-        // "image-alt-empty-link". Mark them so the image-alt rule knows they
-        // are inside a link.
-        for (const img of meaningfulImgs) linkedImages.add(img);
-        return;
-      }
+    const onlyImages = hasOnlyImageContent(link) && meaningfulImgs.length > 0;
+    if (onlyImages) {
+      for (const img of meaningfulImgs) linkedImages.add(img);
+      return;
     }
 
     violations.push(makeViolation("link-name", "serious", "WCAG 4.1.2",

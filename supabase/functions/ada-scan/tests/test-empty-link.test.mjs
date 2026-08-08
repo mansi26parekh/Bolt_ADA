@@ -311,6 +311,41 @@ total++; passed += testLinkedImageRule(
   1, 0
 );
 
+// ── Wrapped-image tests (images nested in wrappers) ──────────────────
+
+console.log("\n══ Wrapped Image (Descendant, Not Direct Child) ══\n");
+
+total++; passed += testLinkedImageRule(
+  "<a><span><img></span></a> → Linked Image, NOT Empty Link",
+  '<a href="/p"><span><img src="x.jpg"></span></a>',
+  0, 1
+);
+total++; passed += testLinkedImageRule(
+  '<a><div><img alt=""></div></a> → Linked Image, NOT Empty Link',
+  '<a href="/p"><div class="thumb"><img src="x.jpg" alt=""></div></a>',
+  0, 1
+);
+total++; passed += testLinkedImageRule(
+  '<a><figure><img alt="Product"></figure></a> → pass (valid alt)',
+  '<a href="/p"><figure><img src="x.jpg" alt="Product"></figure></a>',
+  0, 0
+);
+total++; passed += testLinkedImageRule(
+  "<a><div><span><img></span></div></a> → deeply nested, Linked Image",
+  '<a href="/p"><div><span><img src="x.jpg"></span></div></a>',
+  0, 1
+);
+total++; passed += test(
+  "<a><span><img></span> text</a> → image+text = has name, PASS",
+  '<a href="/p"><span><img src="x.jpg"></span> About</a>',
+  false
+);
+total++; passed += testLinkedImageRule(
+  "Shopify card wrapper: <a><div class='card__media'><img alt=''></div></a>",
+  '<a href="/products/x"><div class="card__media"><img src="p.jpg" alt="" width="400"></div></a>',
+  0, 1
+);
+
 // ── No double-reporting tests ────────────────────────────────────────
 
 console.log("\n══ No Double-Reporting ══\n");
@@ -343,6 +378,21 @@ total++; passed += test(
 total++; passed += test(
   "Link with nested sr-only + visible empty",
   '<a href="/about"><span> </span><span class="sr-only">Details</span></a>',
+  false
+);
+total++; passed += test(
+  "Link with image + aria-hidden SVG (image is meaningful content)",
+  '<a href="/p"><img src="x.jpg"><svg aria-hidden="true"><use href="#icon"></use></svg></a>',
+  false  // image with no alt → defers to image-alt-empty-link, NOT empty link
+);
+total++; passed += testLinkedImageRule(
+  "Link with only aria-hidden content + no images → Empty Link",
+  '<a href="/p"><span aria-hidden="true">Icon</span></a>',
+  1, 0
+);
+total++; passed += test(
+  "Link with title + image with no alt → title gives the link a name",
+  '<a href="/p" title="Product"><img src="x.jpg"></a>',
   false
 );
 
