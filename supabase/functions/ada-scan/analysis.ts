@@ -570,9 +570,8 @@ export function analyzeAccessibility(
 
   // Empty labels
   document.querySelectorAll("label").forEach((label: any) => {
-    const text = getTextContent(label);
-    const hasImgAlt = label.querySelector("img[alt]:not([alt=''])");
-    if (text.length === 0 && !hasImgAlt) {
+    const name = computeAccName(label);
+    if (!name) {
       violations.push(makeViolation("label-empty", "serious", "WCAG 1.3.1",
         "A <label> element exists but is empty. An empty label provides no information to screen reader users about the associated form control.",
         "https://wave.webaim.org/api/references#e_label_empty",
