@@ -361,6 +361,71 @@ total++; passed += testLinkedImageRule(
   0, 1
 );
 
+// ── Non-HTTP href schemes ────────────────────────────────────────────
+
+console.log("\n══ Non-HTTP href Schemes ══\n");
+
+total++; passed += test(
+  "javascript:void(0) with no name → Empty Link",
+  `<div class="grid-card">
+    <a href="javascript:void(0)"
+       data-fancybox=""
+       data-touch="false"
+       data-src="#team_modal_1_2"></a>
+  </div>`,
+  true
+);
+total++; passed += test(
+  "javascript:void(0) with aria-label → PASS",
+  '<a href="javascript:void(0)" aria-label="Open modal"></a>',
+  false
+);
+total++; passed += test(
+  "javascript:void(0) with text → PASS",
+  '<a href="javascript:void(0)">Open</a>',
+  false
+);
+total++; passed += test(
+  "hash-only href with no name → Empty Link",
+  '<a href="#"></a>',
+  true
+);
+total++; passed += test(
+  "hash-only href with text → PASS",
+  '<a href="#">Back to top</a>',
+  false
+);
+total++; passed += test(
+  "fragment href with no name → Empty Link",
+  '<a href="#section-1"></a>',
+  true
+);
+total++; passed += test(
+  "mailto: link with no name → Empty Link",
+  '<a href="mailto:test@example.com"></a>',
+  true
+);
+total++; passed += test(
+  "mailto: link with text → PASS",
+  '<a href="mailto:test@example.com">Email us</a>',
+  false
+);
+total++; passed += test(
+  "tel: link with no name → Empty Link",
+  '<a href="tel:+1234567890"></a>',
+  true
+);
+total++; passed += test(
+  "tel: link with text → PASS",
+  '<a href="tel:+1234567890">Call us</a>',
+  false
+);
+total++; passed += testLinkedImageRule(
+  "javascript:void(0) with linked image (no alt) → Linked Image, NOT Empty Link",
+  '<a href="javascript:void(0)"><img src="photo.jpg"></a>',
+  0, 1
+);
+
 // ── Edge cases ───────────────────────────────────────────────────────
 
 console.log("\n══ Edge Cases ══\n");
