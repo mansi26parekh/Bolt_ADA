@@ -115,11 +115,17 @@ export function analyzeAccessibility(
         text += node.textContent || "";
       } else if (node.nodeType === 1) {
         const child = node;
+        // Skip aria-hidden subtrees — they contribute nothing to the
+        // accessible name per WAI-ARIA spec and WAVE behavior.
+        if (child.getAttribute && child.getAttribute("aria-hidden") === "true") continue;
+        // Skip presentation/none — their children are exposed directly.
         const tag = child.tagName;
         if (tag === "IMG") {
           const alt = child.getAttribute("alt");
           if (alt && alt.trim()) text += alt;
         } else if (tag === "SVG") {
+          // aria-hidden SVGs contribute no name
+          if (child.getAttribute("aria-hidden") === "true") continue;
           const al = child.getAttribute("aria-label");
           if (al && al.trim()) { text += al; continue; }
           const t = child.querySelector("title");
@@ -332,15 +338,20 @@ export function analyzeAccessibility(
   // Track elements already reported to prevent double-reporting
   const reportedImages = new Set<any>();   // images reported as alt_link_missing
 
-  // ── Rule 3 + 4: Links (alt_link_missing > link_empty precedence) ──
+  // ── Rule: Empty Link (WAVE-style link-name) ──
   //
-  // WAVE precedence for links containing images:
-  //   - Image with NO alt + link has no other name → "alt_link_missing"
-  //     (takes precedence over both alt_missing and link_empty)
-  //   - Image with alt="" + link has no other name → "link_empty"
-  //     (alt="" is decorative, so the link itself has no name)
-  //   - Image with alt="text" → link has a name, no violation
-  //   - No image + no text/aria-label/title → "link_empty"
+  // A link is flagged as Empty Link when it has NO meaningful accessible name,
+  // determined by the full WAI-ARIA accessible name computation:
+  //   1. aria-labelledby → text of referenced element(s)
+  //   2. aria-label → attribute value
+  //   3. Subtree text (including alt from child images, SVG aria-label/title)
+  //      — aria-hidden descendants are skipped
+  //   4. title → non-empty title attribute (WAVE accepts as fallback)
+  //
+  // This subsumes the former "image-alt-empty-link" branch: a linked image
+  // with missing/empty alt AND no other link name is reported as a single
+  // Empty Link violation, matching WAVE. The inner image is marked so it is
+  // not double-reported by the standalone image-alt rule.
   //
   // The DOM parser automatically handles Vue/React template directives:
   //   <a :href="..."> has attribute ":href" not "href", so a[href] won't match it.
@@ -355,27 +366,16 @@ export function analyzeAccessibility(
       return;
     }
 
-    // No accessible name — determine if it's a linked-image issue or empty link
-    const imgs = link.querySelectorAll("img");
-    let hasMissingAltImg = false;
-    imgs.forEach((img: any) => {
-      if (!img.hasAttribute("alt") && !isPresentation(img) && !isAriaHidden(img)) {
-        hasMissingAltImg = true;
-        reportedImages.add(img);
-      }
+    // No accessible name — mark inner images so they aren't double-reported
+    // by the standalone image-alt rule (one element → one violation).
+    link.querySelectorAll("img").forEach((img: any) => {
+      if (!isPresentation(img) && !isAriaHidden(img)) reportedImages.add(img);
     });
 
-    if (hasMissingAltImg) {
-      violations.push(makeViolation("image-alt-empty-link", "serious", "WCAG 1.1.1",
-        "A linked image has an empty or missing alt attribute and the link has no other accessible text. Screen readers cannot determine the link's purpose.",
-        "https://wave.webaim.org/api/references#e_alt_link_missing",
-        elHtml(link), buildLocator(link)));
-    } else {
-      violations.push(makeViolation("link-name", "serious", "WCAG 4.1.2",
-        "Link has no accessible text. Screen readers cannot convey this link's purpose to the user.",
-        "https://wave.webaim.org/api/references#e_link_empty",
-        elHtml(link), buildLocator(link)));
-    }
+    violations.push(makeViolation("link-name", "serious", "WCAG 4.1.2",
+      "Link has no accessible name. Screen readers cannot convey this link's purpose to the user.",
+      "https://wave.webaim.org/api/references#e_link_empty",
+      elHtml(link), buildLocator(link)));
   });
 
   // ── Rule 2: Missing alt text (standalone images, not already reported as linked) ──
