@@ -214,6 +214,20 @@ export function analyzeAccessibility(
     return false;
   }
 
+  const hiddenStyleRe = /(?:^|;\s*)(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:;|$|!)/i;
+
+  function isHiddenFromAT(el: any): boolean {
+    if (isAriaHidden(el)) return true;
+    let cur: any = el;
+    while (cur && cur.getAttribute) {
+      if (cur.hasAttribute && cur.hasAttribute("hidden")) return true;
+      const style = cur.getAttribute("style");
+      if (style && hiddenStyleRe.test(style)) return true;
+      cur = cur.parentElement;
+    }
+    return false;
+  }
+
   function isPresentation(el: any): boolean {
     const role = el.getAttribute("role");
     return role === "presentation" || role === "none";
@@ -496,7 +510,7 @@ export function analyzeAccessibility(
     const type = (ctrl.getAttribute("type") || "text").toLowerCase();
     // Skip types that don't need labels (handled above or not text inputs)
     if (tag === "INPUT" && ["hidden", "submit", "reset", "button", "image"].includes(type)) return;
-    if (isAriaHidden(ctrl)) { passCount++; return; }
+    if (isHiddenFromAT(ctrl)) { passCount++; return; }
 
     if (controlHasLabel(ctrl)) {
       passCount++;
