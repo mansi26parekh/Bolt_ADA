@@ -53,19 +53,22 @@ function test(name, html, shouldFlagEmptyLink) {
   return passed;
 }
 
-function testNoDoubleReport(name, html) {
+function testLinkedImageRule(name, html, expectLinkName, expectImageAltEmptyLink) {
   const result = runAnalysis(html);
   const linkVios = findLinkViolations(result.violations);
-  const imgVios = findImageAltViolations(result.violations);
-  const passed = linkVios.length === 1 && imgVios.length === 0;
-  if (passed) {
+  const imgLinkVios = result.violations.filter((v) => v.ruleId === "image-alt-empty-link");
+  const ok =
+    linkVios.length === expectLinkName &&
+    imgLinkVios.length === expectImageAltEmptyLink;
+  if (ok) {
     console.log(`  ✓ ${name}`);
   } else {
     console.log(`  ✗ ${name}`);
-    console.log(`    Expected: 1 link-name + 0 image-alt violations`);
-    console.log(`    Got: ${linkVios.length} link-name + ${imgVios.length} image-alt`);
+    console.log(`    Expected: ${expectLinkName} link-name + ${expectImageAltEmptyLink} image-alt-empty-link`);
+    console.log(`    Got: ${linkVios.length} link-name + ${imgLinkVios.length} image-alt-empty-link`);
+    result.violations.forEach((v) => console.log(`      - ${v.ruleId}: ${v.element?.substring(0, 60)}`));
   }
-  return passed;
+  return ok;
 }
 
 // ── Test suites ──────────────────────────────────────────────────────
@@ -87,8 +90,9 @@ total++; passed += test("Link with tab/newline whitespace", '<a href="/about">\t
 // --- Image alt as link name ---
 console.log("\nImage alt:");
 total++; passed += test("Link with img alt", '<a href="/about"><img alt="About"></a>', false);
-total++; passed += test("Link with img empty alt", '<a href="/about"><img alt=""></a>', true);
-total++; passed += test("Link with img no alt", '<a href="/about"><img></a>', true);
+// Image-only links with missing/empty alt: NOT Empty Link — image-alt-empty-link handles them
+total++; passed += test("Link with img empty alt (NOT empty link)", '<a href="/about"><img alt=""></a>', false);
+total++; passed += test("Link with img no alt (NOT empty link)", '<a href="/about"><img></a>', false);
 
 // --- aria-label ---
 console.log("\naria-label:");
@@ -173,9 +177,9 @@ total++; passed += test(
   false
 );
 total++; passed += test(
-  "WP post thumbnail link with empty alt",
+  "WP post thumbnail link with empty alt (NOT empty link — image-alt-empty-link instead)",
   '<a href="https://example.com/post"><img src="thumb.jpg" alt="" class="wp-post-image"></a>',
-  true
+  false
 );
 
 // ── Shopify-style DOM tests ──────────────────────────────────────────
@@ -183,7 +187,7 @@ total++; passed += test(
 console.log("\n══ Shopify-style Rendered DOM ══\n");
 
 total++; passed += test(
-  "Shopify product card: img with empty alt",
+  "Shopify product card: img with empty alt (NOT empty link — image-alt-empty-link instead)",
   `<div class="card">
     <div class="card__inner">
       <a href="/products/test" class="full-card-link">
@@ -194,7 +198,7 @@ total++; passed += test(
       <p class="card__heading">Test Product</p>
     </div>
   </div>`,
-  true
+  false
 );
 total++; passed += test(
   "Shopify product card: img with alt",
@@ -272,17 +276,54 @@ total++; passed += test(
   true  // The /about link should be flagged
 );
 
+// ── WAVE-Parity: Linked Image Classification ────────────────────────
+
+console.log("\n══ WAVE-Parity: Linked Image Classification ══\n");
+
+// <a><img></a> → image-alt-empty-link, NOT empty link
+total++; passed += testLinkedImageRule(
+  "<a><img></a> → Linked Image Missing Alt, NOT Empty Link",
+  '<a href="/something"><img src="image.jpg"></a>',
+  0, 1
+);
+// <a><img alt=""></a> → image-alt-empty-link, NOT empty link
+total++; passed += testLinkedImageRule(
+  '<a><img alt=""></a> → Linked Image Missing Alt, NOT Empty Link',
+  '<a href="/something"><img src="image.jpg" alt=""></a>',
+  0, 1
+);
+// <a><img alt="Product"></a> → no violation at all
+total++; passed += testLinkedImageRule(
+  '<a><img alt="Product"></a> → No Empty Link, No Missing Alt',
+  '<a href="/something"><img src="image.jpg" alt="Product"></a>',
+  0, 0
+);
+// <a>Product</a> → no empty link
+total++; passed += testLinkedImageRule(
+  "<a>Product</a> → No Empty Link",
+  '<a href="/something">Product</a>',
+  0, 0
+);
+// <a></a> → Empty Link, NOT image-alt-empty-link
+total++; passed += testLinkedImageRule(
+  "<a></a> → Empty Link",
+  '<a href="/something"></a>',
+  1, 0
+);
+
 // ── No double-reporting tests ────────────────────────────────────────
 
-console.log("\n══ No Double-Reporting (Empty Link vs Image-Alt) ══\n");
+console.log("\n══ No Double-Reporting ══\n");
 
-total++; passed += testNoDoubleReport(
-  "Linked image missing alt: 1 link-name, 0 image-alt",
-  '<a href="/about"><img src="test.jpg"></a>'
+total++; passed += testLinkedImageRule(
+  "Linked image missing alt: 0 link-name + 1 image-alt-empty-link",
+  '<a href="/about"><img src="test.jpg"></a>',
+  0, 1
 );
-total++; passed += testNoDoubleReport(
-  "Linked image empty alt: 1 link-name, 0 image-alt",
-  '<a href="/about"><img src="test.jpg" alt=""></a>'
+total++; passed += testLinkedImageRule(
+  "Linked image empty alt: 0 link-name + 1 image-alt-empty-link",
+  '<a href="/about"><img src="test.jpg" alt=""></a>',
+  0, 1
 );
 
 // ── Edge cases ───────────────────────────────────────────────────────

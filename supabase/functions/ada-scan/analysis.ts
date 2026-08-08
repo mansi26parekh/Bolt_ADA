@@ -337,24 +337,19 @@ export function analyzeAccessibility(
 
   // Track elements already reported to prevent double-reporting
   const reportedImages = new Set<any>();   // images reported as alt_link_missing
+  const linkedImages = new Set<any>();     // images inside nameless links — report as image-alt-empty-link
 
   // ── Rule: Empty Link (WAVE-style link-name) ──
   //
-  // A link is flagged as Empty Link when it has NO meaningful accessible name,
-  // determined by the full WAI-ARIA accessible name computation:
-  //   1. aria-labelledby → text of referenced element(s)
-  //   2. aria-label → attribute value
-  //   3. Subtree text (including alt from child images, SVG aria-label/title)
-  //      — aria-hidden descendants are skipped
-  //   4. title → non-empty title attribute (WAVE accepts as fallback)
+  // WAVE precedence for links with no accessible name:
+  //   - If the link's only meaningful content is image(s) whose alt is missing
+  //     or invalid → NOT Empty Link. The image-alt rule reports
+  //     "image-alt-empty-link" (Linked Image Missing Alternative Text) instead.
+  //   - Otherwise (truly empty, whitespace-only, only decorative content) →
+  //     Empty Link.
   //
-  // This subsumes the former "image-alt-empty-link" branch: a linked image
-  // with missing/empty alt AND no other link name is reported as a single
-  // Empty Link violation, matching WAVE. The inner image is marked so it is
-  // not double-reported by the standalone image-alt rule.
-  //
-  // The DOM parser automatically handles Vue/React template directives:
-  //   <a :href="..."> has attribute ":href" not "href", so a[href] won't match it.
+  // "Only meaningful content is images" means: after stripping whitespace text
+  // nodes and aria-hidden elements, every remaining child element is an <img>.
 
   document.querySelectorAll("a[href]").forEach((link: any) => {
     if (isTemplateDirective(link)) { passCount++; return; }
@@ -366,11 +361,37 @@ export function analyzeAccessibility(
       return;
     }
 
-    // No accessible name — mark inner images so they aren't double-reported
-    // by the standalone image-alt rule (one element → one violation).
-    link.querySelectorAll("img").forEach((img: any) => {
-      if (!isPresentation(img) && !isAriaHidden(img)) reportedImages.add(img);
-    });
+    // No accessible name — check whether the link's only content is image(s)
+    // with missing/invalid alt. If so, defer to the image-alt rule.
+    const imgs = link.querySelectorAll("img");
+    const meaningfulImgs: any[] = [];
+    for (const img of Array.from(imgs) as any[]) {
+      if (!isPresentation(img) && !isAriaHidden(img)) meaningfulImgs.push(img);
+    }
+
+    if (meaningfulImgs.length > 0) {
+      // Check whether images are the ONLY non-trivial content in the link.
+      const childElements: any[] = [];
+      for (const node of Array.from(link.childNodes) as any[]) {
+        if (node.nodeType === 3 && node.textContent && node.textContent.trim()) {
+          childElements.push(node); // non-whitespace text node
+        } else if (node.nodeType === 1) {
+          if (node.getAttribute && node.getAttribute("aria-hidden") === "true") continue;
+          childElements.push(node);
+        }
+      }
+      const onlyImages = childElements.length > 0 && childElements.every(
+        (n: any) => n.nodeType === 1 && n.tagName === "IMG"
+      );
+
+      if (onlyImages) {
+        // All content is images — let the image-alt rule report each one as
+        // "image-alt-empty-link". Mark them so the image-alt rule knows they
+        // are inside a link.
+        for (const img of meaningfulImgs) linkedImages.add(img);
+        return;
+      }
+    }
 
     violations.push(makeViolation("link-name", "serious", "WCAG 4.1.2",
       "Link has no accessible name. Screen readers cannot convey this link's purpose to the user.",
@@ -378,25 +399,44 @@ export function analyzeAccessibility(
       elHtml(link), buildLocator(link)));
   });
 
-  // ── Rule 2: Missing alt text (standalone images, not already reported as linked) ──
+  // ── Rule 2: Missing alt text ──
+  // Linked images whose parent <a> has no other name get the more specific
+  // "image-alt-empty-link" (WAVE: Linked Image Missing Alternative Text).
+  // Standalone images without alt get plain "image-alt".
   document.querySelectorAll("img").forEach((img: any) => {
-    if (reportedImages.has(img)) return;  // Already handled by alt_link_missing
+    if (reportedImages.has(img)) return;
     if (isPresentation(img)) return;
     if (isAriaHidden(img)) { passCount++; return; }
 
-    if (!img.hasAttribute("alt")) {
-      // Check if aria-label/aria-labelledby/title provides a name
+    const isLinked = linkedImages.has(img);
+    const hasAlt = img.hasAttribute("alt");
+    const altVal = hasAlt ? (img.getAttribute("alt") || "").trim() : null;
+
+    if (!hasAlt) {
       const name = computeAccName(img);
       if (!name) {
-        violations.push(makeViolation("image-alt", "serious", "WCAG 1.1.1",
-          "Image is missing an alt attribute. Screen readers cannot convey the image's content or purpose to non-sighted users.",
-          "https://wave.webaim.org/api/references#e_alt_missing",
-          elHtml(img), buildLocator(img)));
+        if (isLinked) {
+          violations.push(makeViolation("image-alt-empty-link", "serious", "WCAG 1.1.1",
+            "A linked image has a missing alt attribute and the link has no other accessible text. Screen readers cannot determine the link's purpose.",
+            "https://wave.webaim.org/api/references#e_alt_link_missing",
+            elHtml(img), buildLocator(img)));
+        } else {
+          violations.push(makeViolation("image-alt", "serious", "WCAG 1.1.1",
+            "Image is missing an alt attribute. Screen readers cannot convey the image's content or purpose to non-sighted users.",
+            "https://wave.webaim.org/api/references#e_alt_missing",
+            elHtml(img), buildLocator(img)));
+        }
       } else {
         passCount++;
       }
+    } else if (isLinked && altVal === "") {
+      // Image has alt="" (decorative) but it's the only content of a link —
+      // the link has no name. WAVE reports this as linked-image missing alt.
+      violations.push(makeViolation("image-alt-empty-link", "serious", "WCAG 1.1.1",
+        "A linked image has an empty alt attribute and the link has no other accessible text. Screen readers cannot determine the link's purpose.",
+        "https://wave.webaim.org/api/references#e_alt_link_missing",
+        elHtml(img), buildLocator(img)));
     } else {
-      // Has alt (even empty "" is valid for decorative images)
       passCount++;
     }
   });
