@@ -245,9 +245,9 @@ Deno.serve(async (req: Request) => {
         const appUrl = Deno.env.get("APP_URL") || supabaseUrl.replace(".supabase.co", ".netlify.app");
         const reportUrl = `${appUrl}?scan=${scanId}`;
 
-        // 6. Send email via Resend (if API key is available)
-        const resendKey = Deno.env.get("RESEND_API_KEY");
-        if (resendKey) {
+        // 6. Send email via Brevo (if API key is available)
+        const brevoKey = Deno.env.get("BREVO_API_KEY");
+        if (brevoKey) {
           const emailHtml = buildEmailHtml(
             project.name,
             scanData.scan.url,
@@ -259,17 +259,20 @@ Deno.serve(async (req: Request) => {
             reportUrl,
           );
 
-          const emailResp = await fetch("https://api.resend.com/emails", {
+          const senderEmail = Deno.env.get("EMAIL_FROM") || "noreply@adascanner.com";
+          const senderName = Deno.env.get("EMAIL_FROM_NAME") || "ADA Scanner";
+
+          const emailResp = await fetch("https://api.brevo.com/v3/smtp/email", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${resendKey}`,
+              "api-key": brevoKey,
             },
             body: JSON.stringify({
-              from: Deno.env.get("EMAIL_FROM") || "ADA Scanner <onboarding@resend.dev>",
-              to: [schedule.email],
+              sender: { name: senderName, email: senderEmail },
+              to: [{ email: schedule.email }],
               subject: `ADA Scan Report: ${project.name} — Score ${scanData.scan.score ?? "N/A"}/100`,
-              html: emailHtml,
+              htmlContent: emailHtml,
             }),
           });
 
@@ -277,7 +280,7 @@ Deno.serve(async (req: Request) => {
             console.error("Email send failed:", await emailResp.text());
           }
         } else {
-          console.warn("RESEND_API_KEY not set — skipping email for schedule", schedule.id);
+          console.warn("BREVO_API_KEY not set — skipping email for schedule", schedule.id);
         }
 
         // 7. Advance next_scan_at and update last_scan_id
