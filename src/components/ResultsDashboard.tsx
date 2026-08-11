@@ -196,6 +196,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
     }
     return filtered;
   }, [results, impactFilter, selectedPage]);
+
   const toggleViolation = (id: string) => {
     setExpandedViolations((prev) => {
       const next = new Set(prev);
@@ -255,7 +256,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
             {onScheduleScan && (
               <button
                 onClick={onScheduleScan}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm ${
                   hasActiveSchedule
                     ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                     : "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
@@ -263,12 +264,12 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
               >
                 {hasActiveSchedule ? (
                   <>
-                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    <Clock className="w-4 h-4 text-emerald-400" />
                     Scheduled
                   </>
                 ) : (
                   <>
-                    <CalendarDays className="w-3.5 h-3.5" />
+                    <CalendarDays className="w-4 h-4" />
                     Schedule Scan
                   </>
                 )}
@@ -318,10 +319,10 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                   <IconComp className={`w-6 h-6 ${iconColor}`} />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-white">{dominantLabel}</h2>
-                  <p className={`text-sm font-semibold mt-0.5 ${dominantColor}`}>
+                  <h2 className="text-lg font-bold text-white">{dominantLabel}</h2>
+                  <p className={`text-lg font-bold mt-0.5 ${dominantColor}`}>
                     {totalIssues} Need Fixes{" "}
-                    <span className="text-slate-400 font-normal text-xs">
+                    <span className="text-slate-400 font-normal text-sm">
                       (across {failedPages} of {totalPages} page{totalPages !== 1 ? "s" : ""})
                     </span>
                   </p>
@@ -532,7 +533,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                               <span className="text-xs font-medium text-slate-200 flex-1 min-w-0 truncate">
                                 {group[0].title}
                               </span>
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${config.badge}`}>
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded shrink-0 ${config.badge}`}>
                                 {config.label}
                               </span>
                               {groupExpanded ? (
@@ -624,7 +625,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 px-4 pb-2">
                                         {tagEl && (
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">HTML Element</span>
+                                            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">HTML Element</span>
                                             <code className="text-[12px] font-mono font-extrabold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded">
                                               {tagEl}
                                             </code>
@@ -632,7 +633,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                         )}
                                         {result.selector && (
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Selector</span>
+                                            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">Selector</span>
                                             <code className="text-[12px] font-mono font-extrabold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded max-w-[220px] truncate">
                                               {result.selector}
                                             </code>

@@ -370,7 +370,7 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.badge}`}>
                     {config.label}
                   </span>
-                  <span className="text-[10px] text-slate-400">{result.category}</span>
+                  <span className="text-xs text-slate-400">{result.category}</span>
                 </div>
               </div>
             </div>
@@ -532,7 +532,7 @@ export function InspectPanel({ result, pageUrl, onClose }: InspectPanelProps) {
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.badge}`}>
                     {config.label}
                   </span>
-                  <span className="text-[10px] text-slate-500">{result.category}</span>
+                  <span className="text-xs text-slate-500">{result.category}</span>
                 </div>
               </div>
               <button
