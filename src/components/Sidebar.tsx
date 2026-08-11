@@ -65,7 +65,7 @@ export function Sidebar({ projects, activeProjectId, onSelectProject, onDeletePr
                       ) : (
                         <Folder className="w-3.5 h-3.5 shrink-0 text-slate-500 group-hover:text-slate-300" />
                       )}
-                      <span className="text-xs font-medium truncate capitalize">{project.name}</span>
+                      <span className="text-sm font-medium truncate capitalize">{project.name}</span>
                     </button>
 
                     <button

@@ -248,9 +248,33 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
               <span className="text-sm font-medium">ADA Scanner</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <Globe className="w-3.5 h-3.5" />
-            <span className="max-w-[200px] truncate">{scan.url}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Globe className="w-3.5 h-3.5" />
+              <span className="max-w-[200px] truncate">{scan.url}</span>
+            </div>
+            {onScheduleScan && (
+              <button
+                onClick={onScheduleScan}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  hasActiveSchedule
+                    ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                }`}
+              >
+                {hasActiveSchedule ? (
+                  <>
+                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    Scheduled
+                  </>
+                ) : (
+                  <>
+                    <CalendarDays className="w-3.5 h-3.5" />
+                    Schedule Scan
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -388,28 +412,6 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                   </>
                 )}
               </button>
-              {onScheduleScan && (
-                <button
-                  onClick={onScheduleScan}
-                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm ${
-                    hasActiveSchedule
-                      ? "bg-slate-700 hover:bg-slate-600 text-emerald-300 border border-emerald-500/20"
-                      : "bg-slate-700 hover:bg-slate-600 text-white border border-slate-600"
-                  }`}
-                >
-                  {hasActiveSchedule ? (
-                    <>
-                      <Clock className="w-4 h-4 text-emerald-400" />
-                      Scheduled
-                    </>
-                  ) : (
-                    <>
-                      <CalendarDays className="w-4 h-4" />
-                      Schedule Scan
-                    </>
-                  )}
-                </button>
-              )}
               <div ref={shareRef} className="relative">
               <button
                 onClick={() => setShareOpen((prev) => !prev)}
@@ -587,15 +589,15 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                                 <Wrench className="w-3 h-3" />
                                                 Fix
                                               </button>
-                                              <div className="absolute z-50 bottom-full right-0 mb-2 w-72 p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
+                                              <div className="absolute z-50 bottom-full right-0 mb-2 w-80 max-w-[90vw] p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
                                                 <div className="flex items-center gap-1.5 mb-1.5">
                                                   <Wrench className="w-3 h-3 text-emerald-400 shrink-0" />
                                                   <span className="text-[11px] font-semibold text-emerald-300">Recommended fix</span>
                                                 </div>
-                                                <p className="text-[11px] text-slate-300 leading-relaxed">
+                                                <p className="text-[12px] text-slate-300 leading-relaxed break-words">
                                                   {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
                                                 </p>
-                                                <p className="mt-2 text-[10px] text-slate-500 leading-relaxed italic">
+                                                <p className="mt-2 text-[11px] text-slate-500 leading-relaxed italic break-words">
                                                   {result.description}
                                                 </p>
                                                 <div className="absolute top-full right-3 -mt-px border-4 border-transparent border-t-slate-700" />

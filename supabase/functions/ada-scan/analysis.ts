@@ -258,32 +258,37 @@ export function analyzeAccessibility(
     const id = el.getAttribute("id");
     if (id) return `#${cssEscape(id)}`;
 
+    function escAttr(v: string, max = 0): string {
+      const s = max > 0 && v.length > max ? v.slice(0, max) : v;
+      return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    }
+
     const parts: string[] = [];
     let cur: any = el;
     while (cur && cur.tagName && cur.tagName.toLowerCase() !== "html") {
       let sel = cur.tagName.toLowerCase();
 
       const type = cur.getAttribute("type");
-      if (type) sel += `[type="${type}"]`;
+      if (type) sel += `[type="${escAttr(type)}"]`;
       const name = cur.getAttribute("name");
-      if (name) sel += `[name="${name}"]`;
+      if (name) sel += `[name="${escAttr(name)}"]`;
       const href = cur.getAttribute("href");
-      if (href) sel += `[href="${href.length > 60 ? href.slice(0, 60) + "..." : href}"]`;
+      if (href) sel += `[href="${escAttr(href)}"]`;
       const role = cur.getAttribute("role");
-      if (role) sel += `[role="${role}"]`;
+      if (role) sel += `[role="${escAttr(role)}"]`;
       const ariaLabel = cur.getAttribute("aria-label");
-      if (ariaLabel) sel += `[aria-label="${ariaLabel.length > 40 ? ariaLabel.slice(0, 40) + "..." : ariaLabel}"]`;
+      if (ariaLabel) sel += `[aria-label="${escAttr(ariaLabel, 40)}"]`;
       const placeholder = cur.getAttribute("placeholder");
-      if (placeholder) sel += `[placeholder="${placeholder}"]`;
+      if (placeholder) sel += `[placeholder="${escAttr(placeholder)}"]`;
       const title = cur.getAttribute("title");
-      if (title) sel += `[title="${title.length > 40 ? title.slice(0, 40) + "..." : title}"]`;
+      if (title) sel += `[title="${escAttr(title, 40)}"]`;
       const src = cur.getAttribute("src");
       if (src && (cur.tagName === "IMG" || cur.tagName === "INPUT")) {
-        sel += `[src="${src.length > 60 ? src.slice(0, 60) + "..." : src}"]`;
+        sel += `[src="${escAttr(src, 60)}"]`;
       }
       const value = cur.getAttribute("value");
       if (value && (cur.tagName === "INPUT" || cur.tagName === "BUTTON")) {
-        sel += `[value="${value.length > 40 ? value.slice(0, 40) + "..." : value}"]`;
+        sel += `[value="${escAttr(value, 40)}"]`;
       }
 
       // Add nth-of-type for disambiguation when siblings share the same tag
