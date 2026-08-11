@@ -196,7 +196,6 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
     }
     return filtered;
   }, [results, impactFilter, selectedPage]);
-
   const toggleViolation = (id: string) => {
     setExpandedViolations((prev) => {
       const next = new Set(prev);
