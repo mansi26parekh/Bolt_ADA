@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useScan } from "./hooks/useScan";
 import { LandingPage } from "./components/LandingPage";
 import { ScanningView } from "./components/ScanningView";
@@ -14,7 +14,15 @@ import {
   updateLastScan,
   deleteProject,
 } from "./lib/projectService";
-import type { Project, ScanData } from "./lib/types";
+import {
+  getActiveSchedules,
+  createSchedule,
+  updateSchedule,
+  cancelSchedule,
+} from "./lib/scheduleService";
+import { ScheduleScanModal } from "./components/ScheduleScanModal";
+import { ScheduleList } from "./components/ScheduleList";
+import type { Project, ScanData, ScheduledScan, Recurrence } from "./lib/types";
 
 const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -30,16 +38,19 @@ function App() {
   const [sharedScanData, setSharedScanData] = useState<ScanData | null>(null);
   const [pendingRescan, setPendingRescan] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [schedules, setSchedules] = useState<ScheduledScan[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showScheduleList, setShowScheduleList] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduledScan | null>(null);
   const celebratedScanId = useRef<string | null>(null);
 
   const sharedScanId = new URLSearchParams(window.location.search).get("scan");
   const isSharedView = Boolean(sharedScanId);
 
-  // Load projects on mount
+  // Load projects + schedules on mount
   useEffect(() => {
-    getAllProjects()
-      .then(setProjects)
-      .catch(() => {});
+    getAllProjects().then(setProjects).catch(() => {});
+    getActiveSchedules().then(setSchedules).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -137,6 +148,64 @@ function App() {
     }
   }, [pendingDeleteProject, activeProjectId, resetScan]);
 
+  const activeScheduleForProject = useMemo(
+    () => schedules.find((s) => s.project_id === activeProjectId),
+    [schedules, activeProjectId],
+  );
+
+  const handleScheduleScan = useCallback(() => {
+    if (activeScheduleForProject) {
+      setShowScheduleList(true);
+    } else {
+      setEditingSchedule(null);
+      setShowScheduleModal(true);
+    }
+  }, [activeScheduleForProject]);
+
+  const handleScheduleSubmit = useCallback(
+    async (data: {
+      projectId: string;
+      email: string;
+      recurrence: Recurrence;
+      nextScanAt: string;
+      editId?: string;
+    }) => {
+      if (data.editId) {
+        await updateSchedule(data.editId, {
+          email: data.email,
+          recurrence: data.recurrence,
+          next_scan_at: data.nextScanAt,
+        });
+      } else {
+        await createSchedule(data.projectId, data.email, data.recurrence, data.nextScanAt);
+      }
+      const list = await getActiveSchedules();
+      setSchedules(list);
+      setShowScheduleModal(false);
+      setShowScheduleList(false);
+      setEditingSchedule(null);
+
+      const d = new Date(data.nextScanAt);
+      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      setToastMessage(`Your next scan is scheduled for ${dateStr} at ${timeStr}.`);
+    },
+    [],
+  );
+
+  const handleCancelSchedule = useCallback(async (schedule: ScheduledScan) => {
+    await cancelSchedule(schedule.id);
+    const list = await getActiveSchedules();
+    setSchedules(list);
+    setToastMessage("Schedule cancelled.");
+  }, []);
+
+  const handleEditSchedule = useCallback((schedule: ScheduledScan) => {
+    setEditingSchedule(schedule);
+    setShowScheduleList(false);
+    setShowScheduleModal(true);
+  }, []);
+
   // Show the celebration modal when a scan completes with zero violations.
   useEffect(() => {
     if (
@@ -187,6 +256,8 @@ function App() {
                 onToast={setToastMessage}
                 onRescan={() => setPendingRescan(true)}
                 isRescanning
+                onScheduleScan={handleScheduleScan}
+                hasActiveSchedule={Boolean(activeScheduleForProject)}
               />
               <RescanOverlay scanData={scanData} scanId={scanId} />
             </>
@@ -194,7 +265,7 @@ function App() {
             <ScanningView scanData={scanData} scanId={scanId} />
           )
         ) : view === "results" && scanData ? (
-          <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} onRescan={() => setPendingRescan(true)} isRescanning={false} />
+          <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} onRescan={() => setPendingRescan(true)} isRescanning={false} onScheduleScan={handleScheduleScan} hasActiveSchedule={Boolean(activeScheduleForProject)} />
         ) : (
           <LandingPage
             onStartScan={handleStartScan}
@@ -234,6 +305,29 @@ function App() {
             rescan();
           }}
           onCancel={() => setPendingRescan(false)}
+        />
+      )}
+
+      {showScheduleModal && (
+        <ScheduleScanModal
+          projects={projects}
+          existingSchedules={schedules}
+          editingSchedule={editingSchedule}
+          onSubmit={handleScheduleSubmit}
+          onClose={() => {
+            setShowScheduleModal(false);
+            setEditingSchedule(null);
+          }}
+        />
+      )}
+
+      {showScheduleList && (
+        <ScheduleList
+          schedules={schedules}
+          projects={projects}
+          onEdit={handleEditSchedule}
+          onCancel={handleCancelSchedule}
+          onClose={() => setShowScheduleList(false)}
         />
       )}
     </div>

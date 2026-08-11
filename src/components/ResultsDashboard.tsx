@@ -21,6 +21,8 @@ import {
   Check,
   RefreshCw,
   Loader2,
+  CalendarDays,
+  Clock,
 } from "lucide-react";
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
@@ -94,6 +96,8 @@ interface ResultsDashboardProps {
   onToast?: (message: string) => void;
   onRescan?: () => void;
   isRescanning?: boolean;
+  onScheduleScan?: () => void;
+  hasActiveSchedule?: boolean;
 }
 
 type ImpactLevel = "critical" | "serious" | "moderate" | "minor";
@@ -143,7 +147,7 @@ const impactConfig: Record<ImpactLevel, { icon: typeof AlertOctagon; color: stri
   minor: { icon: Info, color: "text-blue-400", bg: "bg-blue-500/10", badge: "bg-blue-500/20 text-blue-300 border border-blue-500/30", border: "border-l-2 border-l-blue-500/60", label: "Minor" },
 };
 
-export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isRescanning }: ResultsDashboardProps) {
+export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isRescanning, onScheduleScan, hasActiveSchedule }: ResultsDashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>("pages");
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [impactFilter, setImpactFilter] = useState<ImpactLevel | "all">("all");
@@ -384,6 +388,28 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                   </>
                 )}
               </button>
+              {onScheduleScan && (
+                <button
+                  onClick={onScheduleScan}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm ${
+                    hasActiveSchedule
+                      ? "bg-slate-700 hover:bg-slate-600 text-emerald-300 border border-emerald-500/20"
+                      : "bg-slate-700 hover:bg-slate-600 text-white border border-slate-600"
+                  }`}
+                >
+                  {hasActiveSchedule ? (
+                    <>
+                      <Clock className="w-4 h-4 text-emerald-400" />
+                      Scheduled
+                    </>
+                  ) : (
+                    <>
+                      <CalendarDays className="w-4 h-4" />
+                      Schedule Scan
+                    </>
+                  )}
+                </button>
+              )}
               <div ref={shareRef} className="relative">
               <button
                 onClick={() => setShareOpen((prev) => !prev)}

@@ -57,3 +57,17 @@ export interface Project {
   last_scan_id: string | null;
   created_at: string;
 }
+
+export type Recurrence = "monthly" | "every_3_months" | "yearly";
+
+export interface ScheduledScan {
+  id: string;
+  project_id: string;
+  email: string;
+  recurrence: Recurrence;
+  next_scan_at: string;
+  last_scan_id: string | null;
+  status: "active" | "cancelled";
+  created_at: string;
+  updated_at: string;
+}
