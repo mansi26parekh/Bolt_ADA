@@ -1,4 +1,4 @@
-import { Shield, FolderOpen, Folder, Plus, X } from "lucide-react";
+import { Shield, FolderOpen, Folder, Plus, X, Menu } from "lucide-react";
 import type { Project } from "../lib/types";
 
 interface SidebarProps {
@@ -7,11 +7,17 @@ interface SidebarProps {
   onSelectProject: (project: Project) => void;
   onDeleteProject: (project: Project) => void;
   onNewScan: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ projects, activeProjectId, onSelectProject, onDeleteProject, onNewScan }: SidebarProps) {
+export function Sidebar({ projects, activeProjectId, onSelectProject, onDeleteProject, onNewScan, mobileOpen, onMobileClose }: SidebarProps) {
   return (
-    <aside className="w-52 shrink-0 flex flex-col bg-slate-950 border-r border-slate-800/60 h-screen sticky top-0 overflow-hidden">
+    <>
+    {mobileOpen && (
+      <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={onMobileClose} />
+    )}
+    <aside className={`shrink-0 flex flex-col bg-slate-950 border-r border-slate-800/60 h-screen overflow-hidden transition-transform duration-200 z-50 fixed lg:sticky top-0 w-64 lg:w-56 ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 h-14 border-b border-slate-800/60 shrink-0">
         <div className="w-7 h-7 bg-emerald-500 rounded-md flex items-center justify-center shrink-0">
@@ -33,7 +39,7 @@ export function Sidebar({ projects, activeProjectId, onSelectProject, onDeletePr
 
       {/* Projects section */}
       <div className="flex-1 overflow-y-auto px-3 pb-4">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-1 mb-2 mt-1">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1 mb-2 mt-1">
           Projects
         </p>
 
@@ -65,7 +71,7 @@ export function Sidebar({ projects, activeProjectId, onSelectProject, onDeletePr
                       ) : (
                         <Folder className="w-3.5 h-3.5 shrink-0 text-slate-500 group-hover:text-slate-300" />
                       )}
-                      <span className="text-sm font-medium truncate capitalize">{project.name}</span>
+                      <span className="text-base font-medium truncate capitalize">{project.name}</span>
                     </button>
 
                     <button
@@ -83,5 +89,18 @@ export function Sidebar({ projects, activeProjectId, onSelectProject, onDeletePr
         )}
       </div>
     </aside>
+    </>
+  );
+}
+
+export function MobileMenuButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="lg:hidden fixed top-3 left-3 z-30 p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors shadow-lg"
+      aria-label="Open menu"
+    >
+      <Menu className="w-5 h-5" />
+    </button>
   );
 }

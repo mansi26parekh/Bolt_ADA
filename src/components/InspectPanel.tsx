@@ -347,7 +347,7 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
           className={`shrink-0 border-l border-slate-700/60 flex flex-col overflow-hidden
             transition-all duration-500 ease-out
             ${(status === "ready" || status === "not-found")
-              ? "w-[400px] opacity-100 translate-x-0"
+              ? "w-full sm:w-[400px] opacity-100 translate-x-0"
               : "w-0 opacity-0 translate-x-8 pointer-events-none"
             }`}
           style={{ background: "linear-gradient(160deg, #0f172a 0%, #0d1c2e 60%, #0f1a2b 100%)" }}
@@ -514,7 +514,7 @@ export function InspectPanel({ result, pageUrl, onClose }: InspectPanelProps) {
       {/* Side panel */}
       <div
         ref={panelRef}
-        className={`fixed top-0 right-0 h-full w-full max-w-[480px] bg-slate-950 border-l border-slate-800 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 h-full w-full sm:max-w-[480px] bg-slate-950 border-l border-slate-800 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${
           visible && !showPreview ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"

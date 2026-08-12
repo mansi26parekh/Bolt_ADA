@@ -5,7 +5,7 @@ import { ScanningView } from "./components/ScanningView";
 import { ResultsDashboard } from "./components/ResultsDashboard";
 import { RescanOverlay } from "./components/RescanOverlay";
 import { CelebrationModal } from "./components/CelebrationModal";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, MobileMenuButton } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import {
@@ -41,6 +41,7 @@ function App() {
   const [schedules, setSchedules] = useState<ScheduledScan[]>([]);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showScheduleList, setShowScheduleList] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduledScan | null>(null);
   const celebratedScanId = useRef<string | null>(null);
 
@@ -229,13 +230,18 @@ function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
       {showSidebar && (
-        <Sidebar
-          projects={projects}
-          activeProjectId={activeProjectId}
-          onSelectProject={handleSelectProject}
-          onDeleteProject={handleDeleteProject}
-          onNewScan={handleNewScan}
-        />
+        <>
+          <MobileMenuButton onClick={() => setMobileSidebarOpen(true)} />
+          <Sidebar
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelectProject={(p) => { handleSelectProject(p); setMobileSidebarOpen(false); }}
+            onDeleteProject={handleDeleteProject}
+            onNewScan={() => { handleNewScan(); setMobileSidebarOpen(false); }}
+            mobileOpen={mobileSidebarOpen}
+            onMobileClose={() => setMobileSidebarOpen(false)}
+          />
+        </>
       )}
 
       <div className="flex-1 overflow-auto">

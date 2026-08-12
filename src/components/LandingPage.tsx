@@ -96,34 +96,34 @@ export function LandingPage({
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-emerald-500/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-teal-500/5 rounded-full blur-3xl" />
 
-        <div className="relative max-w-5xl mx-auto px-6 pt-20 pb-16">
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16">
           {/* Nav */}
-          <nav className="flex items-center justify-between mb-20">
+          <nav className="flex items-center justify-between mb-10 sm:mb-20">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 bg-emerald-500 rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <span className="text-lg font-semibold tracking-tight">ADA Scanner</span>
             </div>
-            <div className="flex items-center gap-6 text-sm text-slate-400">
+            <div className="hidden sm:flex items-center gap-6 text-sm text-slate-400">
               <a href="#features" className="hover:text-white transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
             </div>
           </nav>
 
           {/* Hero Content */}
-          <div className="text-center max-w-3xl mx-auto mb-14">
+          <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-14">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-medium mb-6">
               <Zap className="w-3.5 h-3.5" />
               Multi-page site scanning
             </div>
-            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight leading-[1.1] mb-5">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-5">
               Find accessibility<br />
               <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
                 issues before your users do
               </span>
             </h1>
-            <p className="text-lg text-slate-400 leading-relaxed max-w-xl mx-auto">
+            <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl mx-auto">
               Scan your entire website for ADA and WCAG compliance violations.
               Crawl multiple pages, get detailed reports, and fix issues that matter.
             </p>
@@ -137,7 +137,7 @@ export function LandingPage({
                   retestChoice === "no" ? "border-emerald-500/60 ring-2 ring-emerald-500/20" : "border-slate-800"
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <div className="flex-1 flex items-center gap-3 px-4">
                     <Globe className="w-5 h-5 text-slate-500 shrink-0" />
                     <input
@@ -152,7 +152,7 @@ export function LandingPage({
                   </div>
                   <button
                     type="submit"
-                    className="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
+                    className="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
                   >
                     Scan Site
                     <ArrowRight className="w-4 h-4" />
@@ -169,7 +169,7 @@ export function LandingPage({
             </form>
 
             {/* Re-test Radio */}
-            <div className="mt-4 flex items-center justify-center gap-6">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-6">
               <span className="text-sm text-slate-400">Do you want to re-test?</span>
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
@@ -262,7 +262,7 @@ export function LandingPage({
       </div>
 
       {/* Features Section */}
-      <section id="features" className="max-w-5xl mx-auto px-6 py-20">
+      <section id="features" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">Comprehensive scanning</h2>
           <p className="text-slate-400">Go beyond single-page checks. Scan your entire site.</p>
@@ -301,7 +301,7 @@ export function LandingPage({
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="max-w-5xl mx-auto px-6 py-20 border-t border-slate-800/50">
+      <section id="how-it-works" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-t border-slate-800/50">
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">How it works</h2>
           <p className="text-slate-400">Three steps to an accessible website.</p>
@@ -325,7 +325,7 @@ export function LandingPage({
       </section>
 
       {/* Checks List */}
-      <section className="max-w-5xl mx-auto px-6 py-20 border-t border-slate-800/50">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-t border-slate-800/50">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold tracking-tight mb-3">What we check</h2>
           <p className="text-slate-400">Covering the most impactful WCAG success criteria.</p>
@@ -358,7 +358,7 @@ export function LandingPage({
 
       {/* Footer */}
       <footer className="border-t border-slate-800/50 py-8">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between text-xs text-slate-600">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between text-xs text-slate-600">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
             ADA Scanner
