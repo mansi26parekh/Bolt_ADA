@@ -13,7 +13,7 @@ import type { Project, ScheduledScan, Recurrence } from "../lib/types";
 const RECURRENCE_LABELS: Record<Recurrence, string> = {
   monthly: "Monthly",
   every_3_months: "Every 3 Months",
-  yearly: "Yearly",
+  once: "Specific Date",
 };
 
 function formatNextScan(iso: string) {

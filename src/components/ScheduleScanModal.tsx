@@ -13,7 +13,7 @@ import type { Project, Recurrence, ScheduledScan } from "../lib/types";
 const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
   { value: "monthly", label: "Monthly" },
   { value: "every_3_months", label: "Every 3 Months" },
-  { value: "yearly", label: "Yearly" },
+  { value: "once", label: "Specific Date" },
 ];
 
 function toLocalDateStr(d: Date) {
@@ -148,7 +148,7 @@ export function ScheduleScanModal({
                 {isEditing ? "Edit Schedule" : "Schedule Scan"}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Automate recurring accessibility audits
+                Automate accessibility audits
               </p>
             </div>
           </div>
@@ -198,7 +198,7 @@ export function ScheduleScanModal({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-400 block">
-                First Scan Date
+                Scan Date
               </label>
               <div className="relative">
                 <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />

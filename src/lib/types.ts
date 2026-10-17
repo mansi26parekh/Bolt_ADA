@@ -58,7 +58,7 @@ export interface Project {
   created_at: string;
 }
 
-export type Recurrence = "monthly" | "every_3_months" | "yearly";
+export type Recurrence = "monthly" | "every_3_months" | "once";
 
 export interface ScheduledScan {
   id: string;

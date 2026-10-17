@@ -1,0 +1,8 @@
+[functions.ada-scan]
+verify_jwt = false
+
+[functions.fetch-page]
+verify_jwt = false
+
+[functions.run-scheduled-scans]
+verify_jwt = false

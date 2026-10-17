@@ -11,7 +11,7 @@ const corsHeaders = {
 function addRecurrence(
   date: Date,
   recurrence: string,
-): Date {
+): Date | null {
   const next = new Date(date);
   switch (recurrence) {
     case "monthly":
@@ -20,9 +20,10 @@ function addRecurrence(
     case "every_3_months":
       next.setMonth(next.getMonth() + 3);
       break;
-    case "yearly":
-      next.setFullYear(next.getFullYear() + 1);
-      break;
+    case "once":
+      return null;
+    default:
+      return null;
   }
   return next;
 }
@@ -291,7 +292,9 @@ Deno.serve(async (req: Request) => {
         await supabase
           .from("scheduled_scans")
           .update({
-            next_scan_at: nextDate.toISOString(),
+            ...(nextDate
+              ? { next_scan_at: nextDate.toISOString() }
+              : { status: "cancelled" }),
             last_scan_id: scanId,
             updated_at: new Date().toISOString(),
           })
