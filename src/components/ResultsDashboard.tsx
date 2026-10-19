@@ -237,6 +237,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
           <div className="flex items-center gap-3 pl-10 lg:pl-0">
             <button
               onClick={onReset}
+              data-tour="results-new-scan"
               className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -249,13 +250,14 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500" data-tour="results-url">
               <Globe className="w-3.5 h-3.5" />
               <span className="max-w-[200px] truncate">{scan.url}</span>
             </div>
             {onScheduleScan && (
               <button
                 onClick={onScheduleScan}
+                data-tour="schedule-btn"
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm ${
                   hasActiveSchedule
                     ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
@@ -313,7 +315,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
           const IconComp = hasCritical ? AlertOctagon : hasSerious ? AlertTriangle : totalIssues > 0 ? AlertCircle : CheckCircle2;
           const iconColor = hasCritical ? "text-red-400" : hasSerious ? "text-orange-400" : totalIssues > 0 ? "text-amber-400" : "text-emerald-400";
           return (
-            <div className={`rounded-xl border p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${heroBg}`}>
+            <div className={`rounded-xl border p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${heroBg}`} data-tour="hero-summary">
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-slate-900/60 border border-slate-700/50 shrink-0`}>
                   <IconComp className={`w-6 h-6 ${iconColor}`} />
@@ -344,7 +346,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
         })()}
 
         {/* ── 4 severity cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="severity-cards">
           {(["critical", "serious", "moderate", "minor"] as ImpactLevel[]).map((level) => {
             const cfg = impactConfig[level];
             const count = violationsByImpact[level];
@@ -372,7 +374,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
         {/* ── Pages list ── */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5" data-tour="page-filter">
               <button
                 onClick={() => setPageFilter("all")}
                 className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${
@@ -398,6 +400,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
               <button
                 onClick={onRescan}
                 disabled={isRescanning}
+                data-tour="rescan-btn"
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
               >
                 {isRescanning ? (
@@ -415,6 +418,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
               <div ref={shareRef} className="relative">
               <button
                 onClick={() => setShareOpen((prev) => !prev)}
+                data-tour="share-btn"
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
               >
                 <Share2 className="w-4 h-4" />
@@ -425,6 +429,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                 <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-600 rounded-xl shadow-xl overflow-hidden z-20">
                   <button
                     onClick={() => { generateDeveloperReport(scanData); setShareOpen(false); }}
+                    data-tour="export-report"
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors text-left"
                   >
                     <Download className="w-4 h-4 text-blue-400 shrink-0" />
@@ -447,7 +452,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
             </div>
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="pages-list">
             {pages.filter((page) => pageFilter === "affected" ? page.violation_count > 0 : true).map((page) => {
               const pageViolations = results.filter((r) => r.page_id === page.id);
               const isExpanded = expandedPage === page.id;
@@ -579,7 +584,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                           </p>
                                           <p className="text-sm text-slate-300 leading-relaxed">{result.description}</p>
                                         </div>
-                                        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                                        <div className="flex items-center gap-1.5 shrink-0 mt-0.5" data-tour="inspect-hint">
                                           {result.help_url && (
                                             <div className="relative group/fix">
                                               <button

@@ -195,7 +195,7 @@ export function ScheduleScanModal({
           </div>
 
           {/* Date + Time row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3" data-tour="schedule-datetime">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-400 block">
                 Scan Date
@@ -228,7 +228,7 @@ export function ScheduleScanModal({
           </div>
 
           {/* Recurrence */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5" data-tour="schedule-recurrence">
             <label className="text-xs font-medium text-slate-400 block">
               Recurrence
             </label>
@@ -251,7 +251,7 @@ export function ScheduleScanModal({
           </div>
 
           {/* Email */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5" data-tour="schedule-email">
             <label className="text-xs font-medium text-slate-400 block">
               Email Address
             </label>
@@ -299,6 +299,7 @@ export function ScheduleScanModal({
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
+            data-tour="schedule-submit"
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/40 disabled:cursor-not-allowed border border-emerald-500/50 rounded-lg transition-colors shadow-sm"
           >
             {submitting ? (

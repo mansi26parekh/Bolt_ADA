@@ -22,6 +22,11 @@ import {
 } from "./lib/scheduleService";
 import { ScheduleScanModal } from "./components/ScheduleScanModal";
 import { ScheduleList } from "./components/ScheduleList";
+import { TourOverlay } from "./components/TourOverlay";
+import type { TourStep } from "./components/TourOverlay";
+import { landingTourSteps, sidebarTourSteps, resultsTourSteps, scanningTourSteps, scheduleModalTourSteps } from "./lib/tourSteps";
+import { hasTourBeenCompleted, markTourCompleted, resetTourCompletion } from "./lib/tourStorage";
+import { HelpCircle } from "lucide-react";
 import type { Project, ScanData, ScheduledScan, Recurrence } from "./lib/types";
 
 const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
@@ -45,8 +50,25 @@ function App() {
   const [editingSchedule, setEditingSchedule] = useState<ScheduledScan | null>(null);
   const celebratedScanId = useRef<string | null>(null);
 
+  const [tourActive, setTourActive] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [tourPhase, setTourPhase] = useState<"landing" | "scanning" | "sidebar" | "results" | "schedule">("landing");
+
   const sharedScanId = new URLSearchParams(window.location.search).get("scan");
   const isSharedView = Boolean(sharedScanId);
+
+  // Auto-start tour on first visit
+  useEffect(() => {
+    if (!isSharedView && !hasTourBeenCompleted()) {
+      const timer = setTimeout(() => {
+        setTourActive(true);
+        setTourStep(0);
+        setTourPhase("landing");
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load projects + schedules on mount
   useEffect(() => {
@@ -227,6 +249,142 @@ function App() {
 
   const showSidebar = view !== "landing" && !isSharedView;
 
+  const tourSteps: TourStep[] =
+    tourPhase === "landing"
+      ? landingTourSteps
+      : tourPhase === "scanning"
+      ? scanningTourSteps
+      : tourPhase === "sidebar"
+      ? sidebarTourSteps
+      : tourPhase === "schedule"
+      ? scheduleModalTourSteps
+      : resultsTourSteps;
+
+  // Pause tour when schedule modal opens mid-results tour, and resume when it closes
+  useEffect(() => {
+    if (!tourActive) return;
+    if (showScheduleModal && tourPhase === "results") {
+      setTourPhase("schedule");
+      setTourStep(0);
+    } else if (!showScheduleModal && tourPhase === "schedule") {
+      setTourPhase("results");
+      setTourStep(0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showScheduleModal]);
+
+  // Auto-advance to scanning phase when a scan starts during landing tour
+  useEffect(() => {
+    if (!tourActive) return;
+    if (view === "scanning" && tourPhase === "landing") {
+      setTourPhase("scanning");
+      setTourStep(0);
+    } else if (view === "results" && tourPhase === "scanning") {
+      setTourPhase("results");
+      setTourStep(0);
+    } else if (view === "landing" && tourPhase !== "landing" && tourPhase !== "schedule") {
+      setTourPhase("landing");
+      setTourStep(0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  const handleTourNext = useCallback(() => {
+    if (tourPhase === "landing" && tourStep >= landingTourSteps.length - 1) {
+      if (view === "scanning") {
+        setTourPhase("scanning");
+        setTourStep(0);
+      } else if (showSidebar) {
+        setTourPhase("sidebar");
+        setTourStep(0);
+      } else {
+        setTourActive(false);
+        markTourCompleted();
+      }
+    } else if (tourPhase === "scanning" && tourStep >= scanningTourSteps.length - 1) {
+      if (view === "results" && scanData) {
+        setTourPhase("results");
+        setTourStep(0);
+      } else if (showSidebar) {
+        setTourPhase("sidebar");
+        setTourStep(0);
+      } else {
+        setTourActive(false);
+        markTourCompleted();
+      }
+    } else if (tourPhase === "sidebar" && tourStep >= sidebarTourSteps.length - 1) {
+      if (view === "results" && scanData) {
+        setTourPhase("results");
+        setTourStep(0);
+      } else {
+        setTourActive(false);
+        markTourCompleted();
+      }
+    } else {
+      setTourStep((prev) => prev + 1);
+    }
+  }, [tourPhase, tourStep, showSidebar, view, scanData]);
+
+  const handleTourBack = useCallback(() => {
+    if (tourStep === 0) {
+      if (tourPhase === "schedule") {
+        setTourPhase("results");
+        setTourStep(resultsTourSteps.length - 1);
+      } else if (tourPhase === "results") {
+        if (showSidebar) {
+          setTourPhase("sidebar");
+          setTourStep(sidebarTourSteps.length - 1);
+        } else {
+          setTourPhase("scanning");
+          setTourStep(scanningTourSteps.length - 1);
+        }
+      } else if (tourPhase === "sidebar") {
+        if (view === "scanning") {
+          setTourPhase("scanning");
+          setTourStep(scanningTourSteps.length - 1);
+        } else {
+          setTourPhase("landing");
+          setTourStep(landingTourSteps.length - 1);
+        }
+      } else if (tourPhase === "scanning") {
+        setTourPhase("landing");
+        setTourStep(landingTourSteps.length - 1);
+      }
+    } else {
+      setTourStep((prev) => prev - 1);
+    }
+  }, [tourStep, tourPhase, showSidebar, view]);
+
+  const handleTourSkip = useCallback(() => {
+    setTourActive(false);
+    markTourCompleted();
+  }, []);
+
+  const handleTourFinish = useCallback(() => {
+    setTourActive(false);
+    markTourCompleted();
+    setToastMessage("Tour complete! You're ready to start scanning.");
+  }, []);
+
+  const handleReplayTour = useCallback(() => {
+    resetTourCompletion();
+    setTourStep(0);
+    if (view === "scanning") {
+      setTourPhase("scanning");
+    } else if (view === "results" && scanData) {
+      if (showScheduleModal) {
+        setTourPhase("schedule");
+      } else {
+        setTourPhase("results");
+      }
+    } else if (showSidebar) {
+      setTourPhase("sidebar");
+    } else {
+      setTourPhase("landing");
+    }
+    setTourActive(true);
+  }, [view, scanData, showSidebar, showScheduleModal]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
       {showSidebar && (
@@ -334,6 +492,30 @@ function App() {
           onEdit={handleEditSchedule}
           onCancel={handleCancelSchedule}
           onClose={() => setShowScheduleList(false)}
+        />
+      )}
+
+      {/* Replay tour button — visible only when tour is not active and not on shared view */}
+      {!tourActive && !isSharedView && (
+        <button
+          onClick={handleReplayTour}
+          className="fixed bottom-4 right-4 z-30 flex items-center gap-2 px-3.5 py-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium rounded-xl shadow-lg backdrop-blur-sm transition-colors"
+          aria-label="Replay onboarding tour"
+          title="Replay onboarding tour"
+        >
+          <HelpCircle className="w-4 h-4 text-emerald-400" />
+          <span className="hidden sm:inline">Tour</span>
+        </button>
+      )}
+
+      {tourActive && (
+        <TourOverlay
+          steps={tourSteps}
+          currentStep={tourStep}
+          onNext={handleTourNext}
+          onBack={handleTourBack}
+          onSkip={handleTourSkip}
+          onFinish={handleTourFinish}
         />
       )}
     </div>

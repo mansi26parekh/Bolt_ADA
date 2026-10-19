@@ -28,7 +28,7 @@ export function ScanningView({ scanData, scanId }: ScanningViewProps) {
         </div>
 
         {/* Progress Bar */}
-        <div className="mb-8">
+        <div className="mb-8" data-tour="scan-progress">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-slate-400">
               {pagesScanned} of {totalPages || "?"} pages scanned
@@ -46,7 +46,7 @@ export function ScanningView({ scanData, scanId }: ScanningViewProps) {
         </div>
 
         {/* Scan ID */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 mb-6">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 mb-6" data-tour="scan-id">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-500">Scan ID</span>
             <code className="text-xs text-slate-400 font-mono">{scanId.slice(0, 8)}...</code>
@@ -55,7 +55,7 @@ export function ScanningView({ scanData, scanId }: ScanningViewProps) {
 
         {/* Page List */}
         {pages.length > 0 && (
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl divide-y divide-slate-800/50">
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl divide-y divide-slate-800/50" data-tour="scan-pagelist">
             <div className="px-4 py-3 flex items-center justify-between">
               <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Pages</span>
               <span className="text-xs text-slate-500">{pages.length} discovered</span>

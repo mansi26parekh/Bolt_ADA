@@ -99,7 +99,7 @@ export function LandingPage({
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16">
           {/* Nav */}
           <nav className="flex items-center justify-between mb-10 sm:mb-20">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5" data-tour="landing-brand">
               <div className="w-9 h-9 bg-emerald-500 rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
@@ -138,7 +138,7 @@ export function LandingPage({
                 }`}
               >
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="flex-1 flex items-center gap-3 px-4">
+                  <div className="flex-1 flex items-center gap-3 px-4" data-tour="scan-url-input">
                     <Globe className="w-5 h-5 text-slate-500 shrink-0" />
                     <input
                       ref={urlInputRef}
@@ -152,6 +152,7 @@ export function LandingPage({
                   </div>
                   <button
                     type="submit"
+                    data-tour="scan-submit-btn"
                     className="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
                   >
                     Scan Site
@@ -169,7 +170,7 @@ export function LandingPage({
             </form>
 
             {/* Re-test Radio */}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-6" data-tour="retest-section">
               <span className="text-sm text-slate-400">Do you want to re-test?</span>
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
@@ -262,7 +263,7 @@ export function LandingPage({
       </div>
 
       {/* Features Section */}
-      <section id="features" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+      <section id="features" data-tour="features-section" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">Comprehensive scanning</h2>
           <p className="text-slate-400">Go beyond single-page checks. Scan your entire site.</p>
@@ -301,7 +302,7 @@ export function LandingPage({
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-t border-slate-800/50">
+      <section id="how-it-works" data-tour="how-it-works" className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-t border-slate-800/50">
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold tracking-tight mb-3">How it works</h2>
           <p className="text-slate-400">Three steps to an accessible website.</p>
