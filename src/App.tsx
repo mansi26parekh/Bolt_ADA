@@ -193,14 +193,20 @@ function App() {
       nextScanAt: string;
       editId?: string;
     }) => {
-      if (data.editId) {
-        await updateSchedule(data.editId, {
-          email: data.email,
-          recurrence: data.recurrence,
-          next_scan_at: data.nextScanAt,
-        });
-      } else {
-        await createSchedule(data.projectId, data.email, data.recurrence, data.nextScanAt);
+      try {
+        if (data.editId) {
+          await updateSchedule(data.editId, {
+            email: data.email,
+            recurrence: data.recurrence,
+            next_scan_at: data.nextScanAt,
+          });
+        } else {
+          await createSchedule(data.projectId, data.email, data.recurrence, data.nextScanAt);
+        }
+      } catch (err) {
+        setToastMessage("Could not save the schedule. Please try again.");
+        console.error("Schedule save failed:", err);
+        return;
       }
       const list = await getActiveSchedules();
       setSchedules(list);
