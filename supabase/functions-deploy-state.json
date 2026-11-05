@@ -1,0 +1,17 @@
+{
+  "projectId": "67060119",
+  "functions": {
+    "ada-scan": {
+      "hasChanged": false,
+      "hash": "38b59638e2d4fb33c38f6a01a60094d6f30e23a1d99138ddc7e0d6c86228cab3"
+    },
+    "fetch-page": {
+      "hasChanged": false,
+      "hash": "b5530d66ac74e5b09c028ef8b9c371bac20da2b51a4d95684445da1126a4bcdd"
+    },
+    "run-scheduled-scans": {
+      "hasChanged": false,
+      "hash": "2b7c0940773470ffa958096d1a358f84228fb03815c05d91c30746fd9f0c2c47"
+    }
+  }
+}
