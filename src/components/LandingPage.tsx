@@ -10,6 +10,10 @@ import {
   History,
   ChevronRight,
   AlertCircle,
+  Layers,
+  RefreshCw,
+  Share2,
+  FolderKanban,
 } from "lucide-react";
 import type { Project } from "../lib/types";
 
@@ -274,46 +278,37 @@ export function LandingPage({
             {
               icon: Search,
               title: "Multi-Page Crawling",
-              description: "Automatically discovers and scans linked pages within your site, not just the URL you enter",
+              description: "Automatically discovers and scans linked pages within your site, not just the URL you enter.",
             },
-       {
-              icon: Search,
+            {
+              icon: Layers,
               title: "All Pages & Affected Pages",
               description: "View complete scan coverage and quickly focus on the pages that contain accessibility issues.",
-         
-         },
-         
-          {
-              icon: Search,
+            },
+            {
+              icon: RefreshCw,
               title: "Re-Scan & Track Improvements",
               description: "Re-scan your website after fixes to verify improvements, track remaining issues, and measure accessibility progress.",
-          
             },
-      {
-              icon: Search,
+            {
+              icon: Share2,
               title: "Shareable Reports",
-              description: "Share accessibility results through a public read-only report link, making it easy for clients and stakeholders to review results without needing access to the tool",
-          
+              description: "Share accessibility results through a public read-only report link, making it easy for clients and stakeholders to review results without needing access to the tool.",
             },
-       {
-              icon: Search,
+            {
+              icon: FolderKanban,
               title: "Project-Based Organization",
-              description: "Keep websites and scan history organized by project, making it easier to manage multiple client websites and track their accessibility journey",
-          
+              description: "Keep websites and scan history organized by project, making it easier to manage multiple client websites and track their accessibility journey.",
             },
-      
             {
               icon: BarChart3,
-              title: " Issue inspection & Detailed Reports",
-              description: "Get per-page scores, categorized violations by WCAG criteria, and specific element selectors",
-              
+              title: "Issue Inspection & Detailed Reports",
+              description: "Get per-page scores, categorized violations by WCAG criteria, and specific element selectors.",
             },
-      
             {
               icon: Shield,
               title: "WCAG 2.1 Coverage",
               description: "Checks for 15+ accessibility rules covering images, forms, headings, ARIA, and more.",
-              
             },
           ].map((feature) => (
             <div
@@ -342,7 +337,7 @@ export function LandingPage({
             { step: "1", title: "Enter your URL", description: "Paste your website address and configure crawl depth and page limits." },
             { step: "2", title: "We scan your site", description: "Our crawler discovers pages and runs accessibility checks on each one." },
             { step: "3", title: "Review and fix", description: "Get a detailed report with violations categorized by impact and WCAG criteria." },
-          ].map((item) => 
+          ].map((item) => (
             <div key={item.step} className="text-center">
               <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-emerald-400 font-bold">{item.step}</span>
@@ -353,7 +348,7 @@ export function LandingPage({
           ))}
         </div>
       </section>
-      
+
       {/* Checks List */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-t border-slate-800/50">
         <div className="text-center mb-10">
