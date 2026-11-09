@@ -353,6 +353,7 @@ export function LandingPage({
           ))}
         </div>
       </section>
+      
       {/* Checks List */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-t border-slate-800/50">
         <div className="text-center mb-10">
