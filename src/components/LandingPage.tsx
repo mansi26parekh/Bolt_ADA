@@ -364,6 +364,7 @@ export function LandingPage({
             "Page titles",
             "Missing Form labels",
             "Button labels",
+      "Multiple form labels",
       "Broken ARIA References",
             "Main landmarks",
           ].map((check) => (
