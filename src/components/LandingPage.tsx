@@ -274,12 +274,15 @@ export function LandingPage({
             {
               icon: Search,
               title: "Multi-Page Crawling",
-              description: "Automatically discovers and scans linked pages within your site, not just the URL you enter.",
+              description: "Automatically discovers and scans linked pages within your site, not just the URL you enter",
             },
        {
               icon: Search,
               title: "All Pages & Affected Pages",
               description: "View complete scan coverage and quickly focus on the pages that contain accessibility issues.",
+         
+         },
+         
           {
               icon: Search,
               title: "Re-Scan & Track Improvements",
@@ -289,7 +292,7 @@ export function LandingPage({
       {
               icon: Search,
               title: "Shareable Reports",
-              description: "Share accessibility results through a public read-only report link, making it easy for clients and stakeholders to review results without needing access to the tool.",
+              description: "Share accessibility results through a public read-only report link, making it easy for clients and stakeholders to review results without needing access to the tool",
           
             },
        {
@@ -302,7 +305,7 @@ export function LandingPage({
             {
               icon: BarChart3,
               title: " Issue inspection & Detailed Reports",
-              description: "Get per-page scores, categorized violations by WCAG criteria, and specific element selectors.",
+              description: "Get per-page scores, categorized violations by WCAG criteria, and specific element selectors",
               
             },
       
