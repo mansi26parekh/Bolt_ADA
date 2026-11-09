@@ -276,9 +276,32 @@ export function LandingPage({
               title: "Multi-Page Crawling",
               description: "Automatically discovers and scans linked pages within your site, not just the URL you enter.",
             },
+       {
+              icon: Search,
+              title: "All Pages & Affected Pages",
+              description: "View complete scan coverage and quickly focus on the pages that contain accessibility issues.",
+          {
+              icon: Search,
+              title: "Re-Scan & Track Improvements",
+              description: "Re-scan your website after fixes to verify improvements, track remaining issues, and measure accessibility progress.",
+          
+            },
+      {
+              icon: Search,
+              title: "Shareable Reports",
+              description: "Share accessibility results through a public read-only report link, making it easy for clients and stakeholders to review results without needing access to the tool.",
+          
+            },
+       {
+              icon: Search,
+              title: "Project-Based Organization",
+              description: "Keep websites and scan history organized by project, making it easier to manage multiple client websites and track their accessibility journey",
+          
+            },
+      
             {
               icon: BarChart3,
-              title: "Detailed Reports",
+              title: " Issue inspection & Detailed Reports",
               description: "Get per-page scores, categorized violations by WCAG criteria, and specific element selectors.",
             },
             {
