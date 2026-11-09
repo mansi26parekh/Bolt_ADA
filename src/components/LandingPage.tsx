@@ -357,21 +357,14 @@ export function LandingPage({
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-3xl mx-auto">
           {[
-            "Image alt text",
+            "Image & linked image missing alt text",
             "Document language",
+            "Empty links"
             "Page titles",
-            "Link text",
-            "Form labels",
-            "Heading hierarchy",
-            "Color contrast",
-            "Skip navigation",
+            "Missing Form labels",
             "Button labels",
             "Iframe titles",
             "Main landmarks",
-            "Table headers",
-            "ARIA validity",
-            "Autoplay media",
-            "Focus management",
           ].map((check) => (
             <div key={check} className="flex items-center gap-2.5 text-sm text-slate-300">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
