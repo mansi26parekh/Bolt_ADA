@@ -357,7 +357,8 @@ export function LandingPage({
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-3xl mx-auto">
           {[
-            "Image & linked image missing alt text",
+            "Image missing alt text",
+      "linked image missing alt text",
             "Document language",
             "Empty links",
             "Page titles",
