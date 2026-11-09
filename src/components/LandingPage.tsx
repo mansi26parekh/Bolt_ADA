@@ -359,7 +359,7 @@ export function LandingPage({
           {[
             "Image & linked image missing alt text",
             "Document language",
-            "Empty links"
+            "Empty links",
             "Page titles",
             "Missing Form labels",
             "Button labels",
