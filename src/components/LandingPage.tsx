@@ -363,7 +363,7 @@ export function LandingPage({
             "Page titles",
             "Missing Form labels",
             "Button labels",
-      "Broken ARIA References"
+      "Broken ARIA References",
             "Main landmarks",
           ].map((check) => (
             <div key={check} className="flex items-center gap-2.5 text-sm text-slate-300">
