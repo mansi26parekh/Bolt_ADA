@@ -303,12 +303,16 @@ export function LandingPage({
               icon: BarChart3,
               title: " Issue inspection & Detailed Reports",
               description: "Get per-page scores, categorized violations by WCAG criteria, and specific element selectors.",
+              
             },
+      
             {
               icon: Shield,
               title: "WCAG 2.1 Coverage",
               description: "Checks for 15+ accessibility rules covering images, forms, headings, ARIA, and more.",
+              
             },
+      
           ].map((feature) => (
             <div
               key={feature.title}
