@@ -214,20 +214,6 @@ export function analyzeAccessibility(
     return false;
   }
 
-  const hiddenStyleRe = /(?:^|;\s*)(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:;|$|!)/i;
-
-  function isHiddenFromAT(el: any): boolean {
-    if (isAriaHidden(el)) return true;
-    let cur: any = el;
-    while (cur && cur.getAttribute) {
-      if (cur.hasAttribute && cur.hasAttribute("hidden")) return true;
-      const style = cur.getAttribute("style");
-      if (style && hiddenStyleRe.test(style)) return true;
-      cur = cur.parentElement;
-    }
-    return false;
-  }
-
   function isPresentation(el: any): boolean {
     const role = el.getAttribute("role");
     return role === "presentation" || role === "none";
@@ -429,28 +415,22 @@ export function analyzeAccessibility(
   document.querySelectorAll("img").forEach((img: any) => {
     if (reportedImages.has(img)) return;
     if (isPresentation(img)) return;
-    if (isAriaHidden(img)) { passCount++; return; }
 
     const isLinked = linkedImages.has(img);
     const hasAlt = img.hasAttribute("alt");
     const altVal = hasAlt ? (img.getAttribute("alt") || "").trim() : null;
 
     if (!hasAlt) {
-      const name = computeAccName(img);
-      if (!name) {
-        if (isLinked) {
-          violations.push(makeViolation("image-alt-empty-link", "serious", "WCAG 1.1.1",
-            "A linked image has a missing alt attribute and the link has no other accessible text. Screen readers cannot determine the link's purpose.",
-            "https://wave.webaim.org/api/references#e_alt_link_missing",
-            elHtml(img), buildLocator(img)));
-        } else {
-          violations.push(makeViolation("image-alt", "serious", "WCAG 1.1.1",
-            "Image is missing an alt attribute. Screen readers cannot convey the image's content or purpose to non-sighted users.",
-            "https://wave.webaim.org/api/references#e_alt_missing",
-            elHtml(img), buildLocator(img)));
-        }
+      if (isLinked) {
+        violations.push(makeViolation("image-alt-empty-link", "serious", "WCAG 1.1.1",
+          "A linked image has a missing alt attribute and the link has no other accessible text. Screen readers cannot determine the link's purpose.",
+          "https://wave.webaim.org/api/references#e_alt_link_missing",
+          elHtml(img), buildLocator(img)));
       } else {
-        passCount++;
+        violations.push(makeViolation("image-alt", "serious", "WCAG 1.1.1",
+          "Image is missing an alt attribute. Screen readers cannot convey the image's content or purpose to non-sighted users.",
+          "https://wave.webaim.org/api/references#e_alt_missing",
+          elHtml(img), buildLocator(img)));
       }
     } else if (isLinked && altVal === "") {
       // Image has alt="" (decorative) but it's the only content of a link —
@@ -485,7 +465,6 @@ export function analyzeAccessibility(
     const type = (input.getAttribute("type") || "text").toLowerCase();
     if (type === "image") {
       // Input image — check alt
-      if (isAriaHidden(input)) { passCount++; return; }
       if (!input.hasAttribute("alt")) {
         violations.push(makeViolation("input-image-alt", "serious", "WCAG 1.1.1",
           "Image input button is missing an alt attribute. Screen readers cannot identify this button's purpose.",
@@ -515,7 +494,6 @@ export function analyzeAccessibility(
     const type = (ctrl.getAttribute("type") || "text").toLowerCase();
     // Skip types that don't need labels (handled above or not text inputs)
     if (tag === "INPUT" && ["hidden", "submit", "reset", "button", "image"].includes(type)) return;
-    if (isHiddenFromAT(ctrl)) { passCount++; return; }
 
     if (controlHasLabel(ctrl)) {
       passCount++;
@@ -656,9 +634,10 @@ export function analyzeAccessibility(
   // reCAPTCHA/hCaptcha inject hidden response textareas at runtime via JS.
   // WAVE (which executes JS) flags them as label_missing. We detect the captcha
   // presence from its script/container markers and synthesize the violation.
+  const reportedCaptchaLabel = (id: string) => violations.some((v) => v.ruleId === "label" && v.element.includes(id));
   const hasRecaptcha = !!document.querySelector("script[src*='recaptcha']") ||
                        !!document.querySelector(".g-recaptcha");
-  if (hasRecaptcha) {
+  if (hasRecaptcha && !reportedCaptchaLabel("g-recaptcha-response")) {
     violations.push(makeViolation("label", "serious", "WCAG 1.3.1",
       "reCAPTCHA injects a hidden response textarea (id=\"g-recaptcha-response\") without an accessible label. Screen reader users cannot identify this control.",
       "https://wave.webaim.org/api/references#e_label_missing",
@@ -666,7 +645,7 @@ export function analyzeAccessibility(
   }
   const hasHcaptcha = !!document.querySelector("script[src*='hcaptcha']") ||
                       !!document.querySelector(".h-captcha");
-  if (hasHcaptcha) {
+  if (hasHcaptcha && !reportedCaptchaLabel("h-captcha-response")) {
     violations.push(makeViolation("label", "serious", "WCAG 1.3.1",
       "hCaptcha injects a hidden response textarea (id=\"h-captcha-response\") without an accessible label. Screen reader users cannot identify this control.",
       "https://wave.webaim.org/api/references#e_label_missing",

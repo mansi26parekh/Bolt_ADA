@@ -26,82 +26,92 @@ function section(title) {
 const page = (body) =>
   `<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><form>${body}</form></body></html>`;
 
-// ── Hidden controls should NOT trigger "label" ──
-section("Hidden Controls — Must Skip (WAVE parity)");
+section("Hidden Controls — Still Evaluated (WAVE parity)");
 
 assert(
   "display:none inline (reCAPTCHA textarea)",
   page('<textarea id="g-recaptcha-response" name="g-recaptcha-response" style="display:none;"></textarea>'),
-  "label", false
+  "label", true
 );
 
 assert(
   "display:none with other styles (real reCAPTCHA HTML)",
   page('<textarea id="g-recaptcha-response-100000" name="g-recaptcha-response" class="g-recaptcha-response" style="width:250px;height:40px;border:1px solid rgb(193,193,193);margin:10px 25px;padding:0px;resize:none;display:none;"></textarea>'),
-  "label", false
+  "label", true
 );
 
 assert(
   "display:none on parent div",
   page('<div style="display:none"><input type="text" id="hidden-input"></div>'),
-  "label", false
+  "label", true
 );
 
 assert(
   "visibility:hidden inline",
   page('<input type="text" style="visibility:hidden">'),
-  "label", false
+  "label", true
 );
 
 assert(
   "visibility:hidden on parent",
   page('<div style="visibility: hidden;"><select><option>a</option></select></div>'),
-  "label", false
+  "select-missing-label", true
 );
 
 assert(
   "HTML hidden attribute",
   page('<input type="text" hidden>'),
-  "label", false
+  "label", true
 );
 
 assert(
   "HTML hidden attribute on parent",
   page('<div hidden><textarea></textarea></div>'),
-  "label", false
+  "label", true
 );
 
 assert(
-  "aria-hidden=true (existing behavior)",
+  "aria-hidden=true",
   page('<input type="text" aria-hidden="true">'),
-  "label", false
+  "label", true
 );
 
 assert(
   "aria-hidden=true on ancestor",
   page('<div aria-hidden="true"><input type="email"></div>'),
-  "label", false
+  "label", true
+);
+
+assert(
+  "tabindex=-1 control",
+  page('<input type="text" tabindex="-1">'),
+  "label", true
 );
 
 assert(
   "display:none with !important",
   page('<input type="text" style="display:none !important;">'),
-  "label", false
+  "label", true
 );
 
 assert(
   "display: none (with spaces)",
   page('<input type="text" style="display : none ;">'),
-  "label", false
+  "label", true
 );
 
 assert(
   "Deeply nested hidden (grandparent display:none)",
   page('<div style="display:none"><div><div><input type="text"></div></div></div>'),
+  "label", true
+);
+
+assert(
+  "Hidden input type is not a labelable control",
+  page('<input type="hidden" name="token" value="x">'),
   "label", false
 );
 
-// ── Visible controls MUST still be flagged ──
 section("Visible Controls — Must Still Flag");
 
 assert(
@@ -134,7 +144,6 @@ assert(
   "label", true
 );
 
-// ── Properly labeled visible controls MUST NOT be flagged ──
 section("Labeled Controls — Must Pass");
 
 assert(
@@ -161,7 +170,6 @@ assert(
   "label", false
 );
 
-// ── Other criteria remain unaffected by hidden controls ──
 section("Other Criteria — Unaffected");
 
 assert(
@@ -182,7 +190,6 @@ assert(
   "image-alt", true
 );
 
-// ── Locator presence (inspect mode support) ──
 section("Locator Presence — Inspect Mode");
 
 (function () {
@@ -204,18 +211,16 @@ section("Locator Presence — Inspect Mode");
   const result = analyzeAccessibility(html, "https://example.com");
   const labelVios = result.violations.filter((v) => v.ruleId === "label");
   const allHaveLocators = labelVios.every((v) => v.selector && v.selector.length > 0);
-  const noneAreHidden = labelVios.every((v) => !v.element.includes("display:none") && !v.element.includes("display: none"));
-  if (labelVios.length === 1 && allHaveLocators && noneAreHidden) {
-    console.log("  \u2713 Only visible control reported; hidden textarea excluded; locator present");
+  if (labelVios.length === 2 && allHaveLocators) {
+    console.log("  \u2713 Hidden and visible unlabeled controls both reported, each with a locator");
     passed++;
   } else {
-    console.log("  \u2717 Hidden textarea leaked into results or locator missing");
-    console.log(`      violations: ${labelVios.length}, all have locators: ${allHaveLocators}, none hidden: ${noneAreHidden}`);
+    console.log("  \u2717 Expected 2 label violations with locators");
+    console.log(`      violations: ${labelVios.length}, all have locators: ${allHaveLocators}`);
     failed++;
   }
 })();
 
-// ══ Summary ══
 console.log(`\n\u2550\u2550 Summary: ${passed}/${passed + failed} passed \u2550\u2550\n`);
 if (failed > 0) {
   console.log(`${failed} test(s) FAILED`);
