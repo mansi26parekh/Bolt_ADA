@@ -136,6 +136,8 @@ const FIX_RECOMMENDATIONS: Record<string, string> = {
     "Ensure every id referenced by aria-labelledby / aria-describedby exists on the page and is unique. Fix the typo, add the missing element, or remove the invalid attribute.",
   "skip-link-broken":
     "Add a target element (e.g. <main id=\"main-content\">) that matches the skip link's href. The skip link must move focus to real content, not a missing anchor.",
+  "frame-title":
+    "Add a title attribute to the <iframe> describing its content (e.g. title=\"Embedded map\"). Screen reader users use it to decide whether to enter the frame.",
   "duplicate-id":
     "Make each id unique on the page. Duplicate ids break in-page anchors, label associations, and ARIA references. Use classes for styling instead of shared ids.",
 };

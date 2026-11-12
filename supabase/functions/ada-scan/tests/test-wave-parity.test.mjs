@@ -63,6 +63,20 @@ assert("Page with a title", page("<p>x</p>", "<title>Services</title>"), "docume
 assert("Page with no title element", page("<p>x</p>", ""), "document-title", true);
 assert("Page with empty title element", page("<p>x</p>", "<title>   </title>"), "document-title", true);
 
+section("Iframe Titles");
+
+assert("Iframe with no title", page('<iframe src="https://maps.example.com"></iframe>'), "frame-title", true);
+assert("Iframe with empty title", page('<iframe src="https://maps.example.com" title="  "></iframe>'), "frame-title", true);
+assert("Iframe with title passes", page('<iframe src="https://maps.example.com" title="Office map"></iframe>'), "frame-title", false);
+assert("Iframe with valid aria-labelledby passes", page('<span id="fdesc">Embedded map</span><iframe src="https://maps.example.com" aria-labelledby="fdesc"></iframe>'), "frame-title", false);
+assert("Iframe with broken aria-labelledby is flagged", page('<iframe src="https://maps.example.com" aria-labelledby="nope"></iframe>'), "frame-title", true);
+
+section("HTML Language");
+
+assert("html without lang", page("<p>x</p>", "<title>T</title>").replace('<html lang="en">', "<html>"), "html-lang-valid", true);
+assert("html with valid lang passes", page("<p>x</p>"), "html-lang-valid", false);
+assert("html with invalid lang (digits only)", page("<p>x</p>", "<title>T</title>").replace('lang="en"', 'lang="123"'), "html-lang-valid", true);
+
 console.log(`\n\u2550\u2550 Summary: ${passed}/${passed + failed} passed \u2550\u2550\n`);
 if (failed > 0) {
   console.log(`${failed} test(s) FAILED`);

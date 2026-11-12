@@ -125,6 +125,7 @@ const RULE_FIXES: Record<string, string> = {
   "landmark-one-main": "Add a <main> landmark to the page structure",
   "region": "Wrap content in landmark regions (main, nav, header, footer)",
   "skip-link": "Add a skip-navigation link as the first focusable element",
+  "frame-title": "Add a title attribute to all <iframe> and <frame> elements",
   "tabindex": "Remove tabindex > 0; use tabindex=\"0\" or \"-1\" only",
   "heading-order": "Use heading levels in sequential order (h1→h2→h3…)",
   "list": "Ensure list children are only <li>, <script>, or <template> elements",

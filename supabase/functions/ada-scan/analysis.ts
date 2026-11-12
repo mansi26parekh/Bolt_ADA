@@ -25,6 +25,7 @@ export const VIOLATION_TITLES: Record<string, string> = {
   "th-empty":              "Empty table header",
   "aria-reference-broken": "Broken ARIA reference",
   "skip-link-broken":      "Broken skip link",
+  "frame-title":           "Missing iframe title",
   "label-title":           "Title-only form label",
   "select-missing-label":  "Missing select label",
 };
@@ -545,15 +546,42 @@ export function analyzeAccessibility(
 
   // ─── Additional rules (DOM-based) ───
 
-  // HTML lang
+  // HTML lang (missing or invalid — WAVE checks both)
   const htmlEl = document.querySelector("html");
   if (htmlEl && !htmlEl.hasAttribute("lang")) {
     violations.push(makeViolation("html-lang-valid", "serious", "WCAG 3.1.1",
       "The <html> element does not have a lang attribute. Screen readers use this to select the correct voice and pronunciation engine.",
       "https://wave.webaim.org/api/references#e_lang_missing", "<html>", "html"));
   } else if (htmlEl) {
-    passCount++;
+    const lang = (htmlEl.getAttribute("lang") || "").trim();
+    const langValid = /^[a-zA-Z]{2,8}(-[a-zA-Z0-9]{1,8})*$/.test(lang);
+    if (!langValid) {
+      violations.push(makeViolation("html-lang-valid", "serious", "WCAG 3.1.1",
+        `The <html> lang attribute value "${truncate(lang, 30)}" is not a valid language code. Screen readers may fall back to the wrong voice or ignore it entirely.`,
+        "https://wave.webaim.org/api/references#e_lang_missing", "<html>", "html"));
+    } else {
+      passCount++;
+    }
   }
+
+  // Iframe / frame title (WAVE error: frame title missing)
+  document.querySelectorAll("iframe, frame").forEach((frame: any) => {
+    const title = frame.getAttribute("title");
+    if (!title || !title.trim()) {
+      const labelledby = frame.getAttribute("aria-labelledby");
+      const hasValidRef = labelledby && labelledby.trim().split(/\s+/).every((id: string) => allIds.has(id));
+      if (!hasValidRef) {
+        violations.push(makeViolation("frame-title", "serious", "WCAG 4.1.2",
+          "An inline frame does not have a title attribute. Screen reader users cannot determine what content the frame contains.",
+          "https://wave.webaim.org/api/references#e_frame_title",
+          elHtml(frame), buildLocator(frame)));
+      } else {
+        passCount++;
+      }
+    } else {
+      passCount++;
+    }
+  });
 
   // Document title
   const titleEl = document.querySelector("title");

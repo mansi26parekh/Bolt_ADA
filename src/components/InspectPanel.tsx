@@ -163,6 +163,14 @@ const FIX_RECOMMENDATIONS: Record<string, { summary: string; code: string }> = {
 ...
 <main id="main-content"><!-- content --></main>`,
   },
+  "frame-title": {
+    summary: "Every <iframe> needs a title attribute describing its content.",
+    code: `<!-- Before -->
+<iframe src="https://maps.example.com"></iframe>
+
+<!-- After -->
+<iframe src="https://maps.example.com" title="Office location map"></iframe>`,
+  },
 };
 
 function getFix(ruleId: string) {
