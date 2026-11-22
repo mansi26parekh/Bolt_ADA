@@ -71,6 +71,15 @@ assert("Iframe with title passes", page('<iframe src="https://maps.example.com" 
 assert("Iframe with valid aria-labelledby passes", page('<span id="fdesc">Embedded map</span><iframe src="https://maps.example.com" aria-labelledby="fdesc"></iframe>'), "frame-title", false);
 assert("Iframe with broken aria-labelledby is flagged", page('<iframe src="https://maps.example.com" aria-labelledby="nope"></iframe>'), "frame-title", true);
 
+section("Image Map Areas");
+
+const map = (areas) => page(`<img src="m.png" alt="" usemap="#m"><map name="m">${areas}</map>`);
+assert("Area with no alt attribute", map('<area shape="rect" coords="0,0,10,10" href="/a">'), "area-alt", true);
+assert("Area with empty alt", map('<area shape="rect" coords="0,0,10,10" href="/a" alt="">'), "area-alt", true);
+assert("Area with whitespace-only alt", map('<area shape="rect" coords="0,0,10,10" href="/a" alt="   ">'), "area-alt", true);
+assert("Area with descriptive alt passes", map('<area shape="rect" coords="0,0,10,10" href="/a" alt="Contact us">'), "area-alt", false);
+assert("Page without image maps has no area-alt", page('<img src="a.jpg" alt="Photo">'), "area-alt", false);
+
 section("HTML Language");
 
 assert("html without lang", page("<p>x</p>", "<title>T</title>").replace('<html lang="en">', "<html>"), "html-lang-valid", true);

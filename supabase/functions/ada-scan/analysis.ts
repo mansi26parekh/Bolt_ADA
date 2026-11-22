@@ -14,6 +14,7 @@ export const VIOLATION_TITLES: Record<string, string> = {
   "image-alt":             "Missing image alternative text",
   "image-alt-empty-link":  "Linked image missing alternative text",
   "input-image-alt":       "Image button missing alternative text",
+  "area-alt":              "Image map area missing alternative text",
   "html-lang-valid":       "Missing or invalid page language",
   "document-title":        "Missing or empty page title",
   "label":                 "Missing form label",
@@ -440,6 +441,19 @@ export function analyzeAccessibility(
         "A linked image has an empty alt attribute and the link has no other accessible text. Screen readers cannot determine the link's purpose.",
         "https://wave.webaim.org/api/references#e_alt_link_missing",
         elHtml(img), buildLocator(img)));
+    } else {
+      passCount++;
+    }
+  });
+
+  // ── Rule: Image map area missing alt (WAVE alt_area_missing) ──
+  document.querySelectorAll("area").forEach((area: any) => {
+    const alt = area.getAttribute("alt");
+    if (alt === null || !alt.trim()) {
+      violations.push(makeViolation("area-alt", "serious", "WCAG 1.1.1",
+        "An image map area (hot spot) has a missing or empty alt attribute. Screen reader users cannot determine where this hot spot leads or what it does.",
+        "https://wave.webaim.org/api/references#e_alt_area_missing",
+        elHtml(area), buildLocator(area)));
     } else {
       passCount++;
     }
