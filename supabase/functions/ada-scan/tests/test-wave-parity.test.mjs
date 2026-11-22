@@ -80,6 +80,26 @@ assert("Area with whitespace-only alt", map('<area shape="rect" coords="0,0,10,1
 assert("Area with descriptive alt passes", map('<area shape="rect" coords="0,0,10,10" href="/a" alt="Contact us">'), "area-alt", false);
 assert("Page without image maps has no area-alt", page('<img src="a.jpg" alt="Photo">'), "area-alt", false);
 
+section("CAPTCHA Injected Fields");
+
+assert("reCAPTCHA v3 api.js script implies unlabeled response textarea",
+  page('<form></form>', '<title>T</title><script src="https://www.google.com/recaptcha/api.js?render=abc"></script>'), "label", true);
+assert("reCAPTCHA widget container implies unlabeled response textarea",
+  page('<div class="g-recaptcha" data-sitekey="abc"></div>'), "label", true);
+assert("Unrelated plugin script mentioning recaptcha in path does not trigger",
+  page('<p>x</p>', '<title>T</title><script src="/wp-content/plugins/cf7/modules/recaptcha/index.js"></script>'), "label", false);
+assert("hCaptcha script implies unlabeled response textarea",
+  page('<p>x</p>', '<title>T</title><script src="https://js.hcaptcha.com/1/api.js"></script>'), "label", true);
+
+section("Button Name From Descendant aria-label");
+
+assert("Button wrapping a search input with aria-label is not empty",
+  page('<button class="hidden" id="search-bar"><div><form><input type="search" aria-label="Search the site"></form></div></button>'), "button-name", false);
+assert("Button with span aria-label is not empty",
+  page('<button><span aria-label="Close"></span></button>'), "button-name", false);
+assert("Button wrapping an unlabeled input is still empty",
+  page('<button><div><input type="search"></div></button>'), "button-name", true);
+
 section("HTML Language");
 
 assert("html without lang", page("<p>x</p>", "<title>T</title>").replace('<html lang="en">', "<html>"), "html-lang-valid", true);

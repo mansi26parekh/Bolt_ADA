@@ -78,8 +78,16 @@ export function analyzeAccessibility(
     return { violations, passCount: 0 };
   }
 
+  // Captcha scripts must be detected before scripts are stripped below.
+  const hasRecaptcha =
+    Array.from(document.querySelectorAll("script[src]")).some((s: any) =>
+      /\/recaptcha\/(api|enterprise)\.js/i.test(s.getAttribute("src") || "")) ||
+    !!document.querySelector(".g-recaptcha, .grecaptcha-badge, textarea[name='g-recaptcha-response']");
+  const hasHcaptcha =
+    !!document.querySelector("script[src*='hcaptcha']") ||
+    !!document.querySelector(".h-captcha, textarea[name='h-captcha-response']");
+
   // Remove script, style, noscript — WAVE evaluates the rendered DOM.
-  // Comments are removed too so they don't interfere with text extraction.
   document.querySelectorAll("script, style, noscript").forEach((el: any) => el.remove());
 
   // ─── Build helper maps (single pass) ───
@@ -135,6 +143,9 @@ export function analyzeAccessibility(
         } else if (tag === "BR") {
           text += " ";
         } else {
+          // WAVE uses a descendant's aria-label in place of its content
+          const al = child.getAttribute("aria-label");
+          if (al && al.trim()) { text += ` ${al} `; continue; }
           text += getSubtreeText(child);
         }
       }
@@ -677,16 +688,12 @@ export function analyzeAccessibility(
   // WAVE (which executes JS) flags them as label_missing. We detect the captcha
   // presence from its script/container markers and synthesize the violation.
   const reportedCaptchaLabel = (id: string) => violations.some((v) => v.ruleId === "label" && v.element.includes(id));
-  const hasRecaptcha = !!document.querySelector("script[src*='recaptcha']") ||
-                       !!document.querySelector(".g-recaptcha");
   if (hasRecaptcha && !reportedCaptchaLabel("g-recaptcha-response")) {
     violations.push(makeViolation("label", "serious", "WCAG 1.3.1",
       "reCAPTCHA injects a hidden response textarea (id=\"g-recaptcha-response\") without an accessible label. Screen reader users cannot identify this control.",
       "https://wave.webaim.org/api/references#e_label_missing",
       '<textarea id="g-recaptcha-response" name="g-recaptcha-response">', '#g-recaptcha-response'));
   }
-  const hasHcaptcha = !!document.querySelector("script[src*='hcaptcha']") ||
-                      !!document.querySelector(".h-captcha");
   if (hasHcaptcha && !reportedCaptchaLabel("h-captcha-response")) {
     violations.push(makeViolation("label", "serious", "WCAG 1.3.1",
       "hCaptcha injects a hidden response textarea (id=\"h-captcha-response\") without an accessible label. Screen reader users cannot identify this control.",
