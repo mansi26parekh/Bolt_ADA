@@ -67,7 +67,7 @@ export function ScanningView({ scanData, scanId }: ScanningViewProps) {
                 ) : page.status === "running" ? (
                   <Loader2 className="w-4 h-4 text-teal-400 shrink-0 animate-spin" />
                 ) : page.status === "failed" ? (
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-slate-500 shrink-0" />
                 ) : (
                   <Globe className="w-4 h-4 text-slate-600 shrink-0" />
                 )}

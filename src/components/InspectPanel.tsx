@@ -214,6 +214,7 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
   const [status, setStatus] = useState<PreviewStatus>("loading");
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [hiddenTarget, setHiddenTarget] = useState(false);
 
   const selector = result.selector;
 
@@ -263,12 +264,18 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === "ada-ready") sendHighlight();
-      if (e.data?.type === "ada-found") setStatus("ready");
+      if (e.data?.type === "ada-found") { setHiddenTarget(Boolean(e.data.hidden)); setStatus("ready"); }
       if (e.data?.type === "ada-not-found") setStatus("not-found");
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [sendHighlight]);
+
+  useEffect(() => {
+    if (!blobUrl || status !== "loading") return;
+    const t = setTimeout(() => setStatus((s) => (s === "loading" ? "not-found" : s)), 25000);
+    return () => clearTimeout(t);
+  }, [blobUrl, status]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -304,7 +311,7 @@ export function PreviewModal({ result, pageUrl, onClose }: PreviewModalProps) {
           </span>
         ) : status === "ready" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-emerald-400 shrink-0">
-            <Check className="w-3 h-3" />Element highlighted
+            <Check className="w-3 h-3" />{hiddenTarget ? "Hidden element — nearest visible area highlighted" : "Element highlighted"}
           </span>
         ) : status === "not-found" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-amber-400 shrink-0">

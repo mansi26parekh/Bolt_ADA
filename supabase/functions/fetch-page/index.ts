@@ -25,6 +25,110 @@ const HIGHLIGHT_SCRIPT = `<script>
     return s.replace(/\\s+/g, ' ').replace(/\\s+/g, ' ').trim().toLowerCase();
   }
 
+  function hidePreloaders() {
+    var els = document.querySelectorAll('[class*="preloader"],[id*="preloader"],[class*="page-loader"],[id*="page-loader"],.loader-wrapper,#loader-wrapper');
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].id === '__ada_badge__') continue;
+      els[i].style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  function safeQueryAll(sel) {
+    try { return Array.prototype.slice.call(document.querySelectorAll(sel)); } catch (e) { return []; }
+  }
+
+  // Stored attribute values may be truncated, and JS may insert siblings
+  // that shift :nth-of-type indexes, so progressively relax the selector.
+  function relaxedSelectors(selector) {
+    var prefix = selector.replace(/="/g, '^="');
+    var noNth = prefix.replace(/:nth-of-type\\(\\d+\\)/g, '');
+    var list = [selector, prefix, noNth];
+    var parts = noNth.split(' > ');
+    if (parts.length > 1) list.push(parts[parts.length - 1]);
+    if (/g-recaptcha-response/.test(selector)) list.push('textarea[name="g-recaptcha-response"]', '[id^="g-recaptcha-response"]');
+    if (/h-captcha-response/.test(selector)) list.push('textarea[name="h-captcha-response"]', '[id^="h-captcha-response"]');
+    return list;
+  }
+
+  function signatureOf(elementHtml) {
+    var m = elementHtml && elementHtml.match(/^\\s*<([a-zA-Z][\\w-]*)([^>]*)>/);
+    if (!m) return null;
+    var tpl = document.createElement('template');
+    tpl.innerHTML = '<' + m[1] + m[2] + '></' + m[1] + '>';
+    var el = tpl.content.firstElementChild;
+    if (!el) return null;
+    var attrs = {};
+    ['id', 'name', 'href', 'src', 'aria-label', 'type', 'title', 'placeholder', 'for'].forEach(function (a) {
+      var v = el.getAttribute(a);
+      if (v) attrs[a] = v;
+    });
+    return { tag: m[1].toLowerCase(), attrs: attrs };
+  }
+
+  function matchesSignature(el, sig) {
+    if (el.tagName.toLowerCase() !== sig.tag) return false;
+    var keys = Object.keys(sig.attrs);
+    if (keys.length === 0) return false;
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i], want = sig.attrs[k];
+      var have = el.getAttribute(k) || (k === 'src' ? (el.getAttribute('data-src') || el.getAttribute('data-lazy-src') || '') : '');
+      if (have !== want && have.indexOf(want) !== 0) return false;
+    }
+    return true;
+  }
+
+  function pickBest(cands, elementHtml, sig) {
+    if (cands.length === 1) return cands[0];
+    if (cands.length === 0) return null;
+    var normStored = elementHtml ? normalizeHtml(elementHtml) : '';
+    for (var i = 0; i < cands.length; i++) {
+      var n = normalizeHtml(cands[i].outerHTML);
+      if (normStored && (n === normStored || n.indexOf(normStored) === 0 || normStored.indexOf(n) === 0)) return cands[i];
+    }
+    if (sig) {
+      var sigMatches = cands.filter(function (c) { return matchesSignature(c, sig); });
+      var vis = sigMatches.filter(isRendered);
+      if (vis.length) return vis[0];
+      if (sigMatches.length) return sigMatches[0];
+    }
+    var visible = cands.filter(isRendered);
+    return visible[0] || cands[0];
+  }
+
+  function findElement(selector, elementHtml) {
+    var sig = signatureOf(elementHtml);
+    var sels = relaxedSelectors(selector);
+    for (var s = 0; s < sels.length; s++) {
+      var cands = safeQueryAll(sels[s]);
+      if (s === sels.length - 1 || s >= 3) {
+        if (sig) cands = cands.filter(function (c) { return matchesSignature(c, sig); });
+      }
+      if (cands.length) return pickBest(cands, elementHtml, sig);
+    }
+    var exact = findExactElement(selector, elementHtml);
+    if (exact) return exact;
+    if (sig) {
+      var bySig = safeQueryAll(sig.tag).filter(function (c) { return matchesSignature(c, sig); });
+      if (bySig.length) return pickBest(bySig, elementHtml, sig);
+    }
+    return null;
+  }
+
+  function isRendered(el) {
+    if (!el.getClientRects || el.getClientRects().length === 0) return false;
+    var cs = window.getComputedStyle(el);
+    return cs.visibility !== 'hidden' && cs.display !== 'none';
+  }
+
+  function visibleTarget(el) {
+    var cur = el;
+    while (cur && cur !== document.documentElement) {
+      if (isRendered(cur)) return cur;
+      cur = cur.parentElement;
+    }
+    return document.body;
+  }
+
   function findExactElement(selector, elementHtml) {
     // Strategy 1: Use CSS selector and disambiguate by elementHtml
     try {
@@ -84,16 +188,26 @@ const HIGHLIGHT_SCRIPT = `<script>
     document.body.appendChild(badge);
   }
 
+  var _attempt = 0;
+  var _retryTimer = null;
+
+  function report(el, selector) {
+    var target = visibleTarget(el);
+    applyHighlight(target);
+    window.parent.postMessage({ type: 'ada-found', selector: selector, hidden: target !== el }, '*');
+  }
+
   function highlight(selector, elementHtml, ruleId) {
     clearHighlight();
+    hidePreloaders();
+    if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
 
     // For skip-link-broken: only highlight the skip link itself, not an unrelated element
     if (ruleId === 'skip-link-broken') {
       try {
-        var el = document.querySelector(selector);
+        var el = document.querySelector(selector) || findElement(selector, elementHtml);
         if (el) {
-          applyHighlight(el);
-          window.parent.postMessage({ type: 'ada-found', selector: selector }, '*');
+          report(el, selector);
         } else {
           window.parent.postMessage({ type: 'ada-not-found', selector: selector }, '*');
         }
@@ -104,11 +218,16 @@ const HIGHLIGHT_SCRIPT = `<script>
       }
     }
 
-    var found = findExactElement(selector, elementHtml);
+    var found = findElement(selector, elementHtml);
     if (found) {
-      applyHighlight(found);
-      window.parent.postMessage({ type: 'ada-found', selector: selector }, '*');
+      _attempt = 0;
+      report(found, selector);
+    } else if (_attempt < 16) {
+      // Content injected by the site's scripts (widgets, captchas) may appear late
+      _attempt++;
+      _retryTimer = setTimeout(function () { highlight(selector, elementHtml, ruleId); }, 500);
     } else {
+      _attempt = 0;
       window.parent.postMessage({ type: 'ada-not-found', selector: selector }, '*');
     }
   }
@@ -144,6 +263,7 @@ Deno.serve(async (req: Request) => {
   }
 
   let html: string;
+  let finalUrl = targetUrl;
   try {
     const res = await fetch(targetUrl, {
       headers: {
@@ -155,6 +275,7 @@ Deno.serve(async (req: Request) => {
       signal: AbortSignal.timeout(20_000),
     });
     html = await res.text();
+    if (res.url) finalUrl = res.url;
   } catch (err) {
     return new Response(JSON.stringify({ error: `Fetch failed: ${String(err)}` }), {
       status: 502,
@@ -167,8 +288,8 @@ Deno.serve(async (req: Request) => {
   html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, "");
 
   // Inject <base> so relative URLs resolve against the original origin
-  const origin = new URL(targetUrl).origin;
-  const baseTag = `<base href="${origin}/">`;
+  const baseHref = finalUrl.replace(/"/g, "%22");
+  const baseTag = `<base href="${baseHref}">`;
   if (!/<base\b/i.test(html)) {
     if (/<head[^>]*>/i.test(html)) {
       html = html.replace(/(<head[^>]*>)/i, `$1${baseTag}`);

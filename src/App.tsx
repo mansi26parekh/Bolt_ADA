@@ -28,6 +28,7 @@ import { landingTourSteps, sidebarTourSteps, resultsTourSteps, scanningTourSteps
 import { hasTourBeenCompleted, markTourCompleted, resetTourCompletion } from "./lib/tourStorage";
 import { HelpCircle } from "lucide-react";
 import type { Project, ScanData, ScheduledScan, Recurrence } from "./lib/types";
+import { SCHEDULE_SCANS_ENABLED } from "./lib/features";
 
 const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -426,7 +427,7 @@ function App() {
                 onToast={setToastMessage}
                 onRescan={() => setPendingRescan(true)}
                 isRescanning
-                onScheduleScan={handleScheduleScan}
+                onScheduleScan={SCHEDULE_SCANS_ENABLED ? handleScheduleScan : undefined}
                 hasActiveSchedule={Boolean(activeScheduleForProject)}
               />
               <RescanOverlay scanData={scanData} scanId={scanId} />
@@ -435,7 +436,7 @@ function App() {
             <ScanningView scanData={scanData} scanId={scanId} />
           )
         ) : view === "results" && scanData ? (
-          <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} onRescan={() => setPendingRescan(true)} isRescanning={false} onScheduleScan={handleScheduleScan} hasActiveSchedule={Boolean(activeScheduleForProject)} />
+          <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} onRescan={() => setPendingRescan(true)} isRescanning={false} onScheduleScan={SCHEDULE_SCANS_ENABLED ? handleScheduleScan : undefined} hasActiveSchedule={Boolean(activeScheduleForProject)} />
         ) : (
           <LandingPage
             onStartScan={handleStartScan}

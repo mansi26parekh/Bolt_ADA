@@ -1,4 +1,5 @@
 import type { TourStep } from "../components/TourOverlay";
+import { SCHEDULE_SCANS_ENABLED } from "./features";
 
 export const landingTourSteps: TourStep[] = [
   {
@@ -81,7 +82,7 @@ export const sidebarTourSteps: TourStep[] = [
   },
 ];
 
-export const resultsTourSteps: TourStep[] = [
+export const resultsTourSteps: TourStep[] = ([
   {
     selector: "[data-tour='results-new-scan']",
     title: "Back to New Scan",
@@ -148,7 +149,7 @@ export const resultsTourSteps: TourStep[] = [
     body: "Inside each expanded violation, hover over \"Fix\" for a step-by-step recommendation, and click \"Inspect\" to preview the element in context. This is where you'll spend most of your time.",
     placement: "center",
   },
-];
+] as TourStep[]).filter((s) => SCHEDULE_SCANS_ENABLED || s.selector !== "[data-tour='schedule-btn']");
 
 export const scheduleModalTourSteps: TourStep[] = [
   {

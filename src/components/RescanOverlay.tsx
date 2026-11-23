@@ -132,7 +132,7 @@ export function RescanOverlay({ scanData, scanId }: RescanOverlayProps) {
                   ) : page.status === "running" ? (
                     <Loader2 className="w-3.5 h-3.5 text-teal-400 shrink-0 animate-spin" />
                   ) : page.status === "failed" ? (
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                   ) : (
                     <Globe className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                   )}
