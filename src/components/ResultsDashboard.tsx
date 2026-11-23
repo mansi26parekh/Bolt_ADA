@@ -596,7 +596,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                                 <Wrench className="w-3 h-3" />
                                                 Fix
                                               </button>
-                                              <div className="absolute z-50 bottom-full right-0 mb-2 w-80 max-w-[90vw] p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none">
+                                              <div className={`absolute z-50 ${idx === 0 ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-80 max-w-[90vw] p-3 rounded-lg bg-slate-900 border border-slate-700 shadow-xl opacity-0 invisible group-hover/fix:opacity-100 group-hover/fix:visible transition-all duration-150 pointer-events-none`}>
                                                 <div className="flex items-center gap-1.5 mb-1.5">
                                                   <Wrench className="w-3 h-3 text-emerald-400 shrink-0" />
                                                   <span className="text-[11px] font-semibold text-emerald-300">Recommended fix</span>
