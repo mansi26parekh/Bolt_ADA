@@ -12,6 +12,10 @@
     "run-scheduled-scans": {
       "hasChanged": false,
       "hash": "2b7c0940773470ffa958096d1a358f84228fb03815c05d91c30746fd9f0c2c47"
+    },
+    "suggest-alt-text": {
+      "hasChanged": false,
+      "hash": "61a9985e59a700c62d7787efb1bad0981e263bc71b3a07ed3699b5c6bc9ab976"
     }
   }
 }

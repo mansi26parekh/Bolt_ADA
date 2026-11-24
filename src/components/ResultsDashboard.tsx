@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   Shield,
   ArrowLeft,
@@ -27,6 +27,8 @@ import {
 import type { ScanData, ScanResult } from "../lib/types";
 import { PreviewModal } from "./InspectPanel";
 import { generateDeveloperReport } from "../lib/pdfExport";
+import { AltTextPanel } from "./AltTextPanel";
+import { type AltSuggestion, altAttribute, fetchAltSuggestion } from "../lib/altTextService";
 
 // Lightweight HTML syntax highlighter — colors tags, attributes, strings, comments.
 const TAG_COLORS: Record<string, string> = {
@@ -162,6 +164,17 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
   const [hoverInspect, setHoverInspect] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
+  const [altSuggestions, setAltSuggestions] = useState<Record<string, AltSuggestion>>({});
+  const altRequested = useRef<Set<string>>(new Set());
+
+  const requestAltSuggestion = useCallback((resultId: string, force = false) => {
+    if (altRequested.current.has(resultId) && !force) return;
+    altRequested.current.add(resultId);
+    setAltSuggestions((prev) => ({ ...prev, [resultId]: { status: "loading" } }));
+    fetchAltSuggestion(resultId).then((s) => {
+      setAltSuggestions((prev) => ({ ...prev, [resultId]: s }));
+    });
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -604,6 +617,17 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                                 <p className="text-[12px] text-slate-300 leading-relaxed break-words">
                                                   {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
                                                 </p>
+                                                {result.rule_id === "image-alt" && altSuggestions[result.id]?.status === "ready" && (() => {
+                                                  const s = altSuggestions[result.id] as Extract<AltSuggestion, { status: "ready" }>;
+                                                  return (
+                                                    <div className="mt-2 p-2 rounded-md bg-emerald-500/[0.06] border border-emerald-500/20">
+                                                      <p className="text-[11px] font-semibold text-emerald-300 mb-1">
+                                                        {s.decorative ? "Recommended (decorative image)" : "Recommended alt text"}
+                                                      </p>
+                                                      <code className="block text-[11px] font-mono text-slate-200 break-all">{altAttribute(s.altText)}</code>
+                                                    </div>
+                                                  );
+                                                })()}
                                                 <p className="mt-2 text-[11px] text-slate-500 leading-relaxed italic break-words">
                                                   {result.description}
                                                 </p>
@@ -655,6 +679,15 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                             <HighlightedHtml html={result.element} />
                                           </pre>
                                         </div>
+                                      )}
+
+                                      {result.rule_id === "image-alt" && (
+                                        <AltTextPanel
+                                          result={result}
+                                          pageUrl={page.url}
+                                          suggestion={altSuggestions[result.id]}
+                                          onRequest={requestAltSuggestion}
+                                        />
                                       )}
                                     </div>
                                   );
