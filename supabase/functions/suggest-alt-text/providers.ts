@@ -19,6 +19,30 @@ export interface AltTextProvider {
   generate(input: AltTextInput): Promise<{ decorative: boolean; alt: string }>;
 }
 
+export class ProviderError extends Error {
+  constructor(message: string, readonly status: number, readonly retryAfterMs: number | null) {
+    super(message);
+  }
+  get retryable() {
+    return this.status === 429 || this.status === 500 || this.status === 503;
+  }
+  get dailyQuota() {
+    return this.status === 429 && /PerDay/i.test(this.message);
+  }
+}
+
+const MAX_ATTEMPTS = 3;
+const MAX_RETRY_WAIT_MS = 10000;
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function parseRetryDelay(body: string): number | null {
+  const m = body.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  return m ? Math.ceil(Number(m[1]) * 1000) : null;
+}
+
 export const ALT_TEXT_INSTRUCTIONS = `You write HTML alt text for web accessibility (WCAG 1.1.1).
 Rules:
 - Describe only what is actually visible in the image and relevant to its purpose on this page. Never invent names, places, brands, numbers or details that are not visible in the image or stated in the page context.
@@ -73,7 +97,11 @@ function geminiProvider(apiKey: string): AltTextProvider {
       );
       if (!res.ok) {
         const detail = await res.text().catch(() => "");
-        throw new Error(`Gemini request failed (${res.status}): ${detail.slice(0, 300)}`);
+        throw new ProviderError(
+          `Gemini request failed (${res.status}): ${detail.slice(0, 1500)}`,
+          res.status,
+          parseRetryDelay(detail),
+        );
       }
       const data = await res.json();
       const text = (data?.candidates?.[0]?.content?.parts ?? [])
@@ -110,12 +138,18 @@ export async function generateAltText(providers: AltTextProvider[], input: AltTe
   let lastError: unknown = new Error("No AI provider configured");
   for (const provider of providers) {
     if (input.image.kind === "raster" && !provider.supportsMimeType(input.image.mimeType)) continue;
-    try {
-      const result = normalize(await provider.generate(input));
-      return { ...result, model: provider.id };
-    } catch (err) {
-      console.error(`Alt text provider ${provider.id} failed:`, err);
-      lastError = err;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const result = normalize(await provider.generate(input));
+        return { ...result, model: provider.id };
+      } catch (err) {
+        console.error(`Alt text provider ${provider.id} attempt ${attempt} failed:`, err);
+        lastError = err;
+        if (!(err instanceof ProviderError) || !err.retryable || err.dailyQuota || attempt === MAX_ATTEMPTS) break;
+        const wait = err.retryAfterMs ?? 2000 * attempt;
+        if (wait > MAX_RETRY_WAIT_MS) break;
+        await sleep(wait + Math.random() * 500);
+      }
     }
   }
   throw lastError;

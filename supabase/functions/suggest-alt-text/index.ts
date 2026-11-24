@@ -3,6 +3,7 @@ import { parseHTML } from "npm:linkedom@0.18.13";
 import {
   type AltTextProvider,
   type ImagePayload,
+  ProviderError,
   anyProviderSupports,
   generateAltText,
   getProviders,
@@ -283,6 +284,19 @@ Deno.serve(async (req: Request) => {
     return json({ imageUrl: final.image_url, altText: final.alt_text, decorative: final.decorative });
   } catch (err) {
     console.error("suggest-alt-text error:", err);
+    if (err instanceof ProviderError && err.dailyQuota) {
+      return json({
+        error: "The AI has reached its daily usage limit. Suggestions will resume once the limit resets.",
+        code: "quota_exhausted",
+      }, 429);
+    }
+    if (err instanceof ProviderError && err.status === 429) {
+      return json({
+        error: "The AI is busy. Retrying shortly...",
+        code: "rate_limited",
+        retryAfterMs: Math.min(err.retryAfterMs ?? 15000, 60000),
+      }, 429);
+    }
     return json({ error: "Could not generate alt text right now. Please try again." }, 500);
   }
 });

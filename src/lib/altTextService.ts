@@ -6,7 +6,44 @@ export type AltSuggestion =
   | { status: "ready"; altText: string; decorative: boolean }
   | { status: "error"; message: string; notConfigured: boolean };
 
+const MAX_RATE_LIMIT_RETRIES = 4;
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function createRequestQueue(concurrency: number) {
+  let active = 0;
+  const pending: Array<() => void> = [];
+  const next = () => {
+    if (active >= concurrency) return;
+    const job = pending.shift();
+    if (job) job();
+  };
+  return function enqueue<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve) => {
+      pending.push(() => {
+        active++;
+        task().then(resolve).finally(() => {
+          active--;
+          next();
+        });
+      });
+      next();
+    });
+  };
+}
+
 export async function fetchAltSuggestion(resultId: string): Promise<AltSuggestion> {
+  for (let attempt = 0; ; attempt++) {
+    const outcome = await requestOnce(resultId);
+    if (!("retryAfterMs" in outcome)) return outcome;
+    if (attempt >= MAX_RATE_LIMIT_RETRIES) {
+      return { status: "error", message: "The AI is busy right now. Please try again in a minute.", notConfigured: false };
+    }
+    await wait(outcome.retryAfterMs + Math.random() * 1000);
+  }
+}
+
+async function requestOnce(resultId: string): Promise<AltSuggestion | { retryAfterMs: number }> {
   try {
     const res = await fetch(API_URL, {
       method: "POST",
@@ -18,6 +55,9 @@ export async function fetchAltSuggestion(resultId: string): Promise<AltSuggestio
       body: JSON.stringify({ resultId }),
     });
     const body = await res.json().catch(() => null);
+    if (res.status === 429 && body?.code === "rate_limited") {
+      return { retryAfterMs: typeof body.retryAfterMs === "number" ? body.retryAfterMs : 15000 };
+    }
     if (!res.ok) {
       return {
         status: "error",
