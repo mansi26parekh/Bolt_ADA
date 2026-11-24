@@ -29,6 +29,7 @@ import { PreviewModal } from "./InspectPanel";
 import { generateDeveloperReport } from "../lib/pdfExport";
 import { AltTextPanel } from "./AltTextPanel";
 import { type AltSuggestion, altAttribute, createRequestQueue, fetchAltSuggestion } from "../lib/altTextService";
+import { AI_ALT_TEXT_ENABLED } from "../lib/features";
 
 // Lightweight HTML syntax highlighter — colors tags, attributes, strings, comments.
 const TAG_COLORS: Record<string, string> = {
@@ -618,7 +619,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                                 <p className="text-[12px] text-slate-300 leading-relaxed break-words">
                                                   {FIX_RECOMMENDATIONS[result.rule_id] || "See the linked reference for guidance on resolving this violation."}
                                                 </p>
-                                                {result.rule_id === "image-alt" && altSuggestions[result.id]?.status === "ready" && (() => {
+                                                {AI_ALT_TEXT_ENABLED && result.rule_id === "image-alt" && altSuggestions[result.id]?.status === "ready" && (() => {
                                                   const s = altSuggestions[result.id] as Extract<AltSuggestion, { status: "ready" }>;
                                                   return (
                                                     <div className="mt-2 p-2 rounded-md bg-emerald-500/[0.06] border border-emerald-500/20">
@@ -682,7 +683,7 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
                                         </div>
                                       )}
 
-                                      {result.rule_id === "image-alt" && (
+                                      {AI_ALT_TEXT_ENABLED && result.rule_id === "image-alt" && (
                                         <AltTextPanel
                                           result={result}
                                           pageUrl={page.url}
