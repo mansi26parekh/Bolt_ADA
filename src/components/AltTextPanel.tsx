@@ -129,7 +129,7 @@ export function AltTextPanel({ result, pageUrl, suggestion, onRequest }: AltText
                 {suggestion.notConfigured ? (
                   <span className="flex items-center gap-1.5 text-amber-300">
                     <KeyRound className="w-3.5 h-3.5" />
-                    AI alt text needs an OpenAI key to be added before it can run.
+                    AI alt text needs a Gemini key to be added before it can run.
                   </span>
                 ) : (
                   <>

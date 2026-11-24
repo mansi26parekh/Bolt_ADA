@@ -1,5 +1,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { parseHTML } from "npm:linkedom@0.18.13";
+import {
+  type AltTextProvider,
+  type ImagePayload,
+  anyProviderSupports,
+  generateAltText,
+  getProviders,
+} from "./providers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +16,6 @@ const corsHeaders = {
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_PAGE_BYTES = 3 * 1024 * 1024;
-const RASTER_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function json(body: unknown, status = 200) {
@@ -165,45 +171,28 @@ async function getPageContext(pageUrl: string, imageUrl: string, storedTitle: st
   return ctx;
 }
 
-interface ImagePayload {
-  kind: "raster" | "svg";
-  dataUrl?: string;
-  svgSource?: string;
-}
+type LoadedImage = { ok: true; image: ImagePayload } | { ok: false; reason: "unavailable" | "unsupported" };
 
-async function loadImage(imageUrl: string): Promise<ImagePayload | null> {
+async function loadImage(imageUrl: string, providers: AltTextProvider[]): Promise<LoadedImage> {
   try {
-    const res = await safeFetch(imageUrl, 10000, "image/avif,image/webp,image/png,image/jpeg,image/*");
-    if (!res) return null;
-    const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    const res = await safeFetch(imageUrl, 10000, "image/webp,image/png,image/jpeg,image/*");
+    if (!res) return { ok: false, reason: "unavailable" };
+    let type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    if (type === "image/jpg") type = "image/jpeg";
     const bytes = await readLimited(res, MAX_IMAGE_BYTES);
-    if (!bytes || bytes.byteLength === 0) return null;
+    if (!bytes || bytes.byteLength === 0) return { ok: false, reason: "unavailable" };
     if (type === "image/svg+xml" || /\.svg($|\?)/i.test(imageUrl)) {
-      return { kind: "svg", svgSource: new TextDecoder().decode(bytes).slice(0, 6000) };
+      return { ok: true, image: { kind: "svg", svgSource: new TextDecoder().decode(bytes).slice(0, 6000) } };
     }
-    if (RASTER_TYPES.includes(type)) {
-      const mime = type === "image/jpg" ? "image/jpeg" : type;
-      return { kind: "raster", dataUrl: `data:${mime};base64,${toBase64(bytes)}` };
-    }
-    return null;
+    if (!anyProviderSupports(providers, type)) return { ok: false, reason: "unsupported" };
+    return { ok: true, image: { kind: "raster", mimeType: type, base64: toBase64(bytes) } };
   } catch {
-    return null;
+    return { ok: false, reason: "unavailable" };
   }
 }
 
-const SYSTEM_PROMPT = `You write HTML alt text for web accessibility (WCAG 1.1.1).
-Rules:
-- Describe only what is actually visible in the image and relevant to its purpose on this page. Never invent names, places, brands, numbers or details that are not visible in the image or stated in the page context.
-- If the image contains meaningful text (logo, banner, chart title), include that text.
-- If the image is a logo, use the brand/organisation name (e.g. "Tripadvisor"), adding "logo" only if helpful.
-- If the image is inside a link, describe the link's purpose rather than the picture.
-- Keep it concise: one short phrase or sentence, ideally under 125 characters. No trailing period for short phrases.
-- Do not start with "image of", "picture of", "photo of" or similar.
-- If the image is purely decorative (spacer, divider, ornamental shape, background texture, or it duplicates adjacent text), set decorative to true and alt to an empty string.
-Respond with JSON only.`;
-
-async function generateAlt(apiKey: string, image: ImagePayload, imageUrl: string, ctx: PageContext) {
-  const contextLines = [
+function contextText(imageUrl: string, ctx: PageContext): string {
+  return [
     `Image file: ${new URL(imageUrl).pathname.split("/").pop() ?? ""}`,
     ctx.pageTitle && `Page title: ${ctx.pageTitle}`,
     ctx.heading && `Main heading: ${ctx.heading}`,
@@ -211,53 +200,6 @@ async function generateAlt(apiKey: string, image: ImagePayload, imageUrl: string
     ctx.linkText && `Image is inside a link: ${ctx.linkText}`,
     ctx.nearbyText && `Nearby text: ${ctx.nearbyText}`,
   ].filter(Boolean).join("\n");
-
-  const userContent: unknown[] = [{ type: "text", text: `Page context:\n${contextLines}` }];
-  if (image.kind === "raster") {
-    userContent.push({ type: "image_url", image_url: { url: image.dataUrl, detail: "low" } });
-  } else {
-    userContent.push({ type: "text", text: `The image is an SVG. Its source code:\n${image.svgSource}` });
-  }
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    signal: AbortSignal.timeout(30000),
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userContent },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "alt_text",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              decorative: { type: "boolean" },
-              alt: { type: "string" },
-            },
-            required: ["decorative", "alt"],
-            additionalProperties: false,
-          },
-        },
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`AI request failed (${res.status})`);
-  const data = await res.json();
-  const parsed = JSON.parse(data?.choices?.[0]?.message?.content ?? "{}");
-  if (typeof parsed.decorative !== "boolean" || typeof parsed.alt !== "string") {
-    throw new Error("AI returned an unexpected response");
-  }
-  const decorative = parsed.decorative;
-  const altText = decorative ? "" : clean(parsed.alt.replace(/"/g, "'"), 250);
-  if (!decorative && !altText) throw new Error("AI returned empty alt text");
-  return { decorative, altText };
 }
 
 Deno.serve(async (req: Request) => {
@@ -304,20 +246,32 @@ Deno.serve(async (req: Request) => {
     const imageUrl = resolveImageUrl(result.element, page.url);
     if (!imageUrl) return json({ error: "This image has no address that can be analysed." }, 422);
 
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!apiKey) return json({ error: "AI alt text is not set up yet.", code: "missing_key" }, 503);
+    const providers = getProviders();
+    if (providers.length === 0) return json({ error: "AI alt text is not set up yet.", code: "missing_key" }, 503);
 
-    const [image, ctx] = await Promise.all([
-      loadImage(imageUrl),
+    const [loaded, ctx] = await Promise.all([
+      loadImage(imageUrl, providers),
       getPageContext(page.url, imageUrl, page.title ?? ""),
     ]);
-    if (!image) return json({ error: "The image could not be loaded for analysis." }, 422);
+    if (!loaded.ok) {
+      return json({
+        error: loaded.reason === "unsupported"
+          ? "This image format can't be analysed by the AI."
+          : "The image could not be loaded for analysis.",
+      }, 422);
+    }
 
-    const { decorative, altText } = await generateAlt(apiKey, image, imageUrl, ctx);
+    const { decorative, altText, model } = await generateAltText(providers, {
+      contextText: contextText(imageUrl, ctx),
+      image: loaded.image,
+    });
 
     await supabase
       .from("alt_text_suggestions")
-      .upsert({ result_id: resultId, image_url: imageUrl, alt_text: altText, decorative }, { onConflict: "result_id", ignoreDuplicates: true });
+      .upsert(
+        { result_id: resultId, image_url: imageUrl, alt_text: altText, decorative, model },
+        { onConflict: "result_id", ignoreDuplicates: true },
+      );
 
     const { data: saved } = await supabase
       .from("alt_text_suggestions")
