@@ -28,12 +28,18 @@ import { landingTourSteps, sidebarTourSteps, resultsTourSteps, scanningTourSteps
 import { hasTourBeenCompleted, markTourCompleted, resetTourCompletion } from "./lib/tourStorage";
 import { HelpCircle } from "lucide-react";
 import type { Project, ScanData, ScheduledScan, Recurrence } from "./lib/types";
+import { useAccount } from "./hooks/useAccount";
+import { AccountDialog } from "./components/AccountDialog";
+import { supabase } from "./lib/supabase";
 import { SCHEDULE_SCANS_ENABLED } from "./lib/features";
 
 const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 function App() {
+  const account = useAccount();
+  const [accountMode, setAccountMode] = useState<"signin" | "profile" | "email" | null>(null);
+  const [shareError, setShareError] = useState(false);
   const { view, scanData, scanId, error, isRescanning, previousScanData, startScan, rescan, goToResults, resetScan } = useScan();
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -73,23 +79,30 @@ function App() {
 
   // Load projects + schedules on mount
   useEffect(() => {
-    getAllProjects().then(setProjects).catch(() => {});
-    getActiveSchedules().then(setSchedules).catch(() => {});
-  }, []);
+    let active = true;
+    setProjects([]); setSchedules([]); setActiveProjectId(null);
+    resetScan();
+    if (account.user) {
+      getAllProjects().then(list => { if (active) setProjects(list); }).catch(() => setToastMessage("Could not load your projects."));
+      getActiveSchedules().then(list => { if (active) setSchedules(list); }).catch(() => {});
+      setAccountMode(null);
+    }
+    return () => { active = false; };
+  }, [account.user?.id, resetScan]);
 
   useEffect(() => {
     if (!sharedScanId) return;
     let cancelled = false;
-    fetch(`${API_URL}/${sharedScanId}`, {
+    fetch(`${API_URL}/public/${sharedScanId}`,  {
       headers: {
         "Content-Type": "application/json",
         "apikey": ANON_KEY,
         "Authorization": `Bearer ${ANON_KEY}`,
       },
     })
-      .then((res) => res.json())
-      .then((data: ScanData) => { if (!cancelled) setSharedScanData(data); })
-      .catch(() => {});
+      .then(async (res) => { if (!res.ok) throw new Error(); return res.json(); })
+      .then((data: ScanData) => { if (!data.scan || !Array.isArray(data.results) || !Array.isArray(data.pages)) throw new Error(); if (!cancelled) setSharedScanData(data); })
+      .catch(() => { if (!cancelled) setShareError(true); });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sharedScanId]);
@@ -111,6 +124,8 @@ function App() {
 
   const handleStartScan = useCallback(
     async (url: string, maxDepth: number) => {
+      if (account.loading) return;
+      if (!account.user) { setTourActive(false); setAccountMode("signin"); return; }
       try {
         const { project, alreadyExisted } = await ensureProject(url);
         const isDifferentProject = project.id !== activeProjectId;
@@ -124,13 +139,12 @@ function App() {
             [...prev, project].sort((a, b) => a.name.localeCompare(b.name))
           );
         }
+        await startScan(url, maxDepth, project.id);
       } catch {
-        // Project creation failure is non-blocking — scan still proceeds
+        setToastMessage("Could not create your project. Please try again.");
       }
-
-      startScan(url, maxDepth);
     },
-    [startScan, activeProjectId]
+    [startScan, activeProjectId, account.user, account.loading]
   );
 
   const handleSelectProject = useCallback(
@@ -254,7 +268,15 @@ function App() {
     handleNewScan();
   }, [handleNewScan]);
 
-  const showSidebar = view !== "landing" && !isSharedView;
+  const showSidebar = Boolean(account.user) && view !== "landing" && !isSharedView;
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) { setToastMessage("Could not sign out. Please try again."); return; }
+    setAccountMode(null); setProjects([]); setSchedules([]); setActiveProjectId(null);
+    setPendingRescan(false); setPendingDeleteProject(null); setShowScheduleModal(false); setShowScheduleList(false); setShowCelebration(false);
+    resetScan();
+  };
+  const maskedEmail = account.user?.email?.replace(/^(.)(.*)(@.*)$/, "$1•••$3") ?? "";
 
   const tourSteps: TourStep[] =
     tourPhase === "landing"
@@ -403,6 +425,11 @@ function App() {
             onSelectProject={(p) => { handleSelectProject(p); setMobileSidebarOpen(false); }}
             onDeleteProject={handleDeleteProject}
             onNewScan={() => { handleNewScan(); setMobileSidebarOpen(false); }}
+            accountName={account.name}
+            accountEmail={maskedEmail}
+            onProfile={() => setAccountMode("profile")}
+            onChangeEmail={() => setAccountMode("email")}
+            onSignOut={() => void signOut()}
             mobileOpen={mobileSidebarOpen}
             onMobileClose={() => setMobileSidebarOpen(false)}
           />
@@ -415,14 +442,14 @@ function App() {
             <ResultsDashboard scanData={sharedScanData} onReset={() => {}} onToast={setToastMessage} />
           ) : (
             <div className="flex items-center justify-center h-full text-slate-400">
-              <p className="text-sm">Loading shared report…</p>
+              <p className="text-sm">{shareError ? "This shared report is unavailable." : "Loading shared report…"}</p>
             </div>
           )
         ) : view === "scanning" && scanId ? (
-          isRescanning ? (
+          isRescanning && (previousScanData || scanData) ? (
             <>
               <ResultsDashboard
-                scanData={previousScanData || scanData}
+                scanData={(previousScanData || scanData)!}
                 onReset={handleNewScan}
                 onToast={setToastMessage}
                 onRescan={() => setPendingRescan(true)}
@@ -439,6 +466,8 @@ function App() {
           <ResultsDashboard scanData={scanData} onReset={handleNewScan} onToast={setToastMessage} onRescan={() => setPendingRescan(true)} isRescanning={false} onScheduleScan={SCHEDULE_SCANS_ENABLED ? handleScheduleScan : undefined} hasActiveSchedule={Boolean(activeScheduleForProject)} />
         ) : (
           <LandingPage
+            onAccount={() => { setTourActive(false); setAccountMode(account.user ? "profile" : "signin"); }}
+            signedIn={Boolean(account.user)}
             onStartScan={handleStartScan}
             error={error}
             initialUrl={landingInitialUrl}
@@ -448,6 +477,8 @@ function App() {
         )}
       </div>
 
+      {accountMode && <AccountDialog key={`${accountMode}-${account.user?.id}`} user={account.user} name={account.name} mode={accountMode} onClose={() => setAccountMode(null)} onName={account.setName} onMode={setAccountMode} onSignOut={() => void signOut()} />}
+      {account.notice && <Toast message={account.notice} onDismiss={() => account.setNotice("")} />}
       {toastMessage && (
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
       )}

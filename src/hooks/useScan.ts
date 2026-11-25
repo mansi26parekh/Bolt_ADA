@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "../lib/supabase";
 import type { ScanData, View } from "../lib/types";
 
 const API_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ada-scan`;
@@ -13,22 +14,24 @@ export function useScan() {
   const [previousScanData, setPreviousScanData] = useState<ScanData | null>(null);
 
   // Remember the parameters of the most recent scan so a re-scan can reuse them.
-  const lastScanParams = useRef<{ url: string; maxDepth: number } | null>(null);
+  const lastScanParams = useRef<{ url: string; maxDepth: number; projectId: string } | null>(null);
 
-  const startScan = useCallback(async (url: string, maxDepth: number) => {
+  const startScan = useCallback(async (url: string, maxDepth: number, projectId: string) => {
     setError(null);
     setScanData(null);
-    lastScanParams.current = { url, maxDepth };
+    lastScanParams.current = { url, maxDepth, projectId };
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) throw new Error("Sign in before scanning.");
       const response = await fetch(API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "apikey": ANON_KEY,
-          "Authorization": `Bearer ${ANON_KEY}`,
+          "Authorization": `Bearer ${sessionData.session.access_token}`,
         },
-        body: JSON.stringify({ url, maxDepth }),
+        body: JSON.stringify({ url, maxDepth, projectId }),
       });
 
       if (!response.ok) {
@@ -46,11 +49,13 @@ export function useScan() {
 
   const fetchScanData = useCallback(async (id: string) => {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return;
       const response = await fetch(`${API_URL}/${id}`, {
         headers: {
           "Content-Type": "application/json",
           "apikey": ANON_KEY,
-          "Authorization": `Bearer ${ANON_KEY}`,
+          "Authorization": `Bearer ${sessionData.session.access_token}`,
         },
       });
 
@@ -87,7 +92,7 @@ export function useScan() {
     if (!params || isRescanning) return;
     setPreviousScanData(scanData);
     setIsRescanning(true);
-    await startScan(params.url, params.maxDepth);
+    await startScan(params.url, params.maxDepth, params.projectId);
   }, [startScan, scanData, isRescanning]);
 
   const goToResults = useCallback((id: string) => {

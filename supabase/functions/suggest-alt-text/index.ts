@@ -219,6 +219,13 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    const token = req.headers.get("Authorization")?.replace(/^Bearer /i, "") ?? "";
+    const { data: identity } = await supabase.auth.getUser(token);
+    if (!identity.user) return json({ error: "Sign in required" }, 401);
+    const scoped = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } });
+    const { data: owned } = await scoped.from("scan_results").select("id").eq("id", resultId).maybeSingle();
+    if (!owned) return json({ error: "Image issue not found" }, 404);
+
     const { data: cached } = await supabase
       .from("alt_text_suggestions")
       .select("image_url, alt_text, decorative")

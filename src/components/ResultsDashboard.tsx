@@ -29,6 +29,7 @@ import { PreviewModal } from "./InspectPanel";
 import { generateDeveloperReport } from "../lib/pdfExport";
 import { AltTextPanel } from "./AltTextPanel";
 import { type AltSuggestion, altAttribute, createRequestQueue, fetchAltSuggestion } from "../lib/altTextService";
+import { supabase } from "../lib/supabase";
 import { AI_ALT_TEXT_ENABLED } from "../lib/features";
 
 // Lightweight HTML syntax highlighter — colors tags, attributes, strings, comments.
@@ -231,6 +232,11 @@ export function ResultsDashboard({ scanData, onReset, onToast, onRescan, isResca
   const closeInspect = () => { setInspectResult(null); setInspectPageUrl(null); };
 
   const handleShare = async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session && !new URLSearchParams(window.location.search).has("scan")) {
+      const { error } = await supabase.rpc("share_report", { p_scan: scan.id });
+      if (error) { onToast?.("Could not create a share link. Please try again."); return; }
+    }
     const shareUrl = `${window.location.origin}${window.location.pathname}?scan=${scan.id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);

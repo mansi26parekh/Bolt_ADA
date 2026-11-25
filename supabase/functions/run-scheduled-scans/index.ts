@@ -148,6 +148,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    if (req.headers.get("Authorization") !== `Bearer ${supabaseKey}`) return new Response(JSON.stringify({ error: "Not authorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const now = new Date().toISOString();
@@ -175,7 +176,7 @@ Deno.serve(async (req: Request) => {
 
     for (const schedule of dueSchedules) {
       const project = schedule.projects;
-      if (!project) {
+      if (!project?.user_id) {
         results.push({ scheduleId: schedule.id, status: "skipped_no_project" });
         continue;
       }
@@ -188,7 +189,7 @@ Deno.serve(async (req: Request) => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${supabaseKey}`,
           },
-          body: JSON.stringify({ url: project.url, maxDepth: 3 }),
+          body: JSON.stringify({ url: project.url, maxDepth: 3, projectId: project.id }),
         });
 
         if (!scanResp.ok) {
@@ -230,6 +231,8 @@ Deno.serve(async (req: Request) => {
           .from("projects")
           .update({ last_scan_id: scanId })
           .eq("id", project.id);
+
+        await supabase.from("shared_reports").upsert({ scan_id: scanId }, { onConflict: "scan_id" });
 
         // 4. Build severity counts
         const severityCounts: Record<string, number> = {

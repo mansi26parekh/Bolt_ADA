@@ -1,4 +1,4 @@
-import { Shield, FolderOpen, Folder, Plus, X, Menu } from "lucide-react";
+import { Shield, FolderOpen, Folder, Plus, X, Menu, UserCircle } from "lucide-react";
 import type { Project } from "../lib/types";
 
 interface SidebarProps {
@@ -7,11 +7,16 @@ interface SidebarProps {
   onSelectProject: (project: Project) => void;
   onDeleteProject: (project: Project) => void;
   onNewScan: () => void;
+  accountName: string;
+  accountEmail: string;
+  onProfile: () => void;
+  onChangeEmail: () => void;
+  onSignOut: () => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export function Sidebar({ projects, activeProjectId, onSelectProject, onDeleteProject, onNewScan, mobileOpen, onMobileClose }: SidebarProps) {
+export function Sidebar({ projects, activeProjectId, onSelectProject, onDeleteProject, onNewScan, accountName, accountEmail, onProfile, onChangeEmail, onSignOut, mobileOpen, onMobileClose }: SidebarProps) {
   return (
     <>
     {mobileOpen && (
@@ -88,6 +93,12 @@ export function Sidebar({ projects, activeProjectId, onSelectProject, onDeletePr
             })}
           </ul>
         )}
+      </div>
+      <div className="shrink-0 border-t border-slate-800/60 p-4 text-sm text-slate-300">
+        <div className="flex items-center gap-2 mb-3"><UserCircle className="w-8 h-8 text-emerald-400 shrink-0" /><div className="min-w-0"><p className="truncate font-medium text-white">{accountName || "My Account"}</p><p className="truncate text-xs text-slate-400">{accountEmail}</p></div></div>
+        <button onClick={onProfile} className="block py-1 hover:text-white">My Profile</button>
+        <button onClick={onChangeEmail} className="block py-1 hover:text-white">Change Email</button>
+        <button onClick={onSignOut} className="block py-1 hover:text-white">Sign Out</button>
       </div>
     </aside>
     </>

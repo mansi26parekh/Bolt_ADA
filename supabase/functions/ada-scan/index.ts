@@ -32,11 +32,22 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     if (req.method === "GET" && path.startsWith("/") && path.length > 1) {
-      const scanId = path.slice(1);
+      const publicReport = path.startsWith("/public/");
+      const scanId = publicReport ? path.slice(8) : path.slice(1);
+      if (!/^[0-9a-f-]{36}$/i.test(scanId)) return new Response(JSON.stringify({ error: "Report unavailable" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const token = req.headers.get("Authorization")?.replace(/^Bearer /i, "") ?? "";
+      const internal = token === supabaseKey;
+      const { data: identity } = internal || publicReport ? { data: { user: null } } : await supabase.auth.getUser(token);
+      if (publicReport) {
+        const { data: shared } = await supabase.from("shared_reports").select("scan_id").eq("scan_id", scanId).maybeSingle();
+        if (!shared) return new Response(JSON.stringify({ error: "Report unavailable" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } else if (!internal && !identity.user) {
+        return new Response(JSON.stringify({ error: "Sign in required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const { data: scan, error: scanError } = await supabase
         .from("scans").select("*").eq("id", scanId).maybeSingle();
 
-      if (scanError || !scan) {
+      if (scanError || !scan || (!publicReport && !internal && scan.user_id !== identity.user?.id)) {
         return new Response(JSON.stringify({ error: "Scan not found" }), {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -60,14 +71,21 @@ Deno.serve(async (req: Request) => {
         offset += 1000;
       }
 
+      const { user_id: _owner, project_id: _project, ...reportScan } = scan;
       return new Response(
-        JSON.stringify({ scan, pages: pages || [], results: allResults }),
+        JSON.stringify({ scan: publicReport ? reportScan : scan, pages: pages || [], results: allResults }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (req.method === "POST" && path === "/") {
       const body = await req.json();
+      const token = req.headers.get("Authorization")?.replace(/^Bearer /i, "") ?? "";
+      const internal = token === supabaseKey;
+      const { data: identity } = internal ? { data: { user: null } } : await supabase.auth.getUser(token);
+      if (!internal && !identity.user) return new Response(JSON.stringify({ error: "Sign in required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { data: project } = await supabase.from("projects").select("id,user_id").eq("id", body.projectId).maybeSingle();
+      if (!project?.user_id || (!internal && project.user_id !== identity.user?.id)) return new Response(JSON.stringify({ error: "Project unavailable" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const targetUrl = body.url;
       const maxDepth = body.maxDepth || 3;
 
@@ -80,7 +98,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: scan, error: scanError } = await supabase
         .from("scans")
-        .insert({ url: targetUrl, status: "running", max_depth: maxDepth, total_pages: 0, pages_scanned: 0 })
+        .insert({ user_id: project.user_id, project_id: project.id, url: targetUrl, status: "running", max_depth: maxDepth, total_pages: 0, pages_scanned: 0 })
         .select().single();
 
       if (scanError || !scan) {

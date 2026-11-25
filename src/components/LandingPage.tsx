@@ -23,6 +23,8 @@ interface LandingPageProps {
   initialUrl?: string;
   projects?: Project[];
   onSelectProject?: (project: Project) => void;
+  onAccount: () => void;
+  signedIn: boolean;
 }
 
 export function LandingPage({
@@ -31,6 +33,8 @@ export function LandingPage({
   initialUrl = "",
   projects = [],
   onSelectProject,
+  onAccount,
+  signedIn,
 }: LandingPageProps) {
   const [url, setUrl] = useState(initialUrl);
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -109,9 +113,10 @@ export function LandingPage({
               </div>
               <span className="text-lg font-semibold tracking-tight">ADA Scanner</span>
             </div>
-            <div className="hidden sm:flex items-center gap-6 text-sm text-slate-400">
-              <a href="#features" className="hover:text-white transition-colors">Features</a>
-              <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
+            <div className="flex items-center gap-4 text-sm text-slate-400">
+              <a href="#features" className="hidden sm:block hover:text-white transition-colors">Features</a>
+              <a href="#how-it-works" className="hidden sm:block hover:text-white transition-colors">How It Works</a>
+              <button onClick={onAccount} className="rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-500">{signedIn ? "My Profile" : "Sign Up"}</button>
             </div>
           </nav>
 
